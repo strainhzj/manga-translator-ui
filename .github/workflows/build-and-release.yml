@@ -80,7 +80,7 @@ jobs:
         mkdir -p $TUF_TARGETS_DIR
 
         echo "Downloading assets from release $PREVIOUS_TAG..."
-        gh release download $PREVIOUS_TAG -D $TUF_TARGETS_DIR -p "*.tar.gz.7z.*"
+        gh release download $PREVIOUS_TAG -D $TUF_TARGETS_DIR -p "*.tar.gz.7z.*" || true
         
         echo "Merging split archives..."
         for f in $(find $TUF_TARGETS_DIR -name '*.tar.gz.7z.001'); do
