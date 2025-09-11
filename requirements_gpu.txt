@@ -64,3 +64,5 @@ open_clip_torch
 google-generativeai
 python-bidi
 tufup
+google-cloud
+google-genai

@@ -67,3 +67,5 @@ torchsummary
 open_clip_torch
 python-bidi
 tufup 
+google-cloud
+google-genai
