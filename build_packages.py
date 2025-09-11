@@ -170,6 +170,11 @@ class Builder:
         print(f"Adding update package for {version_type.upper()}")
         print("=" * 60)
 
+        # For GPU, we skip the auto-update process entirely as per user decision
+        if version_type == 'gpu':
+            print("Skipping TUF packaging for GPU version.")
+            return True
+
         self.version_file.write_text(self.app_version, encoding='utf-8')
         dist_dir = Path("dist") / f"manga-translator-{version_type}"
 
@@ -178,27 +183,15 @@ class Builder:
             return False
 
         print(f"Adding bundle from: {dist_dir}")
-        # Let tufup use the base version number
+        # For CPU, we create the bundle for future diffing, but the full archive will be deleted
+        # before deploying to gh-pages. Patches, however, will be kept.
         self.repo.add_bundle(
             new_bundle_dir=dist_dir,
             new_version=self.app_version,
             custom_metadata={'variant': version_type},
             required=False,
-            skip_patch=True
+            skip_patch=False  # Ensure patches can be created in the future
         )
-
-        # Manually rename the created archive to include the variant
-        original_archive_name = f"{APP_NAME}-{self.app_version}.tar.gz"
-        new_archive_name = f"{APP_NAME}-{self.app_version}-{version_type}.tar.gz"
-        original_archive_path = Path(REPO_DIR) / 'targets' / original_archive_name
-        new_archive_path = Path(REPO_DIR) / 'targets' / new_archive_name
-
-        if original_archive_path.exists():
-            print(f"Renaming {original_archive_name} to {new_archive_name}")
-            os.rename(original_archive_path, new_archive_path)
-        else:
-            print(f"Warning: Expected archive {original_archive_name} not found for renaming.")
-
         return True
 
     def publish_updates(self):

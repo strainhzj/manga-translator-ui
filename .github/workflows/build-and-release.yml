@@ -129,16 +129,12 @@ jobs:
       run: |
         python build_packages.py ${{ github.ref_name }} --update-repo --skip-build
 
-    - name: Deploy Repository to GitHub Pages
+    - name: Prepare gh-pages Deployment
       run: |
-        echo "Preparing to deploy to gh-pages..."
-        # IMPORTANT: Remove large files from the TUF targets directory before deploying to gh-pages
-        # to avoid exceeding the repository size limit. These large files will be handled
-        # as release assets instead.
-        find update_repository/targets -type f -size +1990M -exec git rm --cached {} \;
-        echo "Large files removed from git index. Ready to deploy."
+        echo "Removing full archives from TUF repository before deploying to gh-pages..."
+        find update_repository/targets -type f -name "*.tar.gz" -exec echo "Removing {}..." \; -exec rm {} \;
 
-    - name: Deploy to GitHub Pages
+    - name: Deploy Repository to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
         personal_token: ${{ secrets.GH_PAT }}
@@ -168,28 +164,27 @@ jobs:
         cp -r MangaStudio_Data dist/manga-translator-gpu/__pycache__/
         cp VERSION dist/manga-translator-gpu/__pycache__/
 
-    - name: Prepare All Release Assets
+    - name: Create Release Archives using 7-Zip with Splitting
       run: |
-        echo "Preparing all assets for GitHub Release..."
-        RELEASE_ASSETS_DIR="release_assets"
-        TUF_TARGETS_DIR="update_repository/targets"
-        mkdir -p $RELEASE_ASSETS_DIR
+        mkdir -p release_assets
+        cd dist/manga-translator-cpu/
+        7z a -v1990m -m0=lzma2 -ms=on ../../release_assets/manga-translator-cpu-${{ github.ref_name }}.7z .
+        cd ../../
+        cd dist/manga-translator-gpu/
+        7z a -v1990m -m0=lzma2 -ms=on ../../release_assets/manga-translator-gpu-${{ github.ref_name }}.7z .
 
-        # 1. Create split archives for manual download
-        echo "Creating archives for manual download..."
-        7z a -v1990m "$RELEASE_ASSETS_DIR/manga-translator-cpu-${{ github.ref_name }}.7z" ./dist/manga-translator-cpu/*
-        7z a -v1990m "$RELEASE_ASSETS_DIR/manga-translator-gpu-${{ github.ref_name }}.7z" ./dist/manga-translator-gpu/*
-
-        # 2. Prepare TUF assets for auto-update (and future diffs)
+    - name: Prepare TUF Assets for Release
+      run: |
         echo "Preparing TUF assets..."
-        # Copy small TUF assets directly
+        TUF_TARGETS_DIR="update_repository/targets"
+        RELEASE_ASSETS_DIR="release_assets"
+        # Copy any TUF assets that are small enough directly
         find $TUF_TARGETS_DIR -type f -size -1990M -exec cp {} $RELEASE_ASSETS_DIR/ \;
-        # Create split archives for large TUF assets
+        # For TUF assets that are too large, create split archives
         find $TUF_TARGETS_DIR -type f -size +1990M | while read f; do
-          echo "Splitting large TUF asset for release: $f"
+          echo "Splitting large TUF asset: $f"
           7z a -v1990m "$RELEASE_ASSETS_DIR/$(basename "$f").7z" "$f"
         done
-
         echo "Final release assets list:"
         ls -l $RELEASE_ASSETS_DIR
 
