@@ -314,12 +314,20 @@ class OcrConfig(BaseModel):
     """Use bbox merge when Manga OCR inference."""
     ocr: Ocr = Ocr.ocr48px
     """Optical character recognition (OCR) model to use"""
+    use_hybrid_ocr: bool = False
+    """Enable hybrid OCR mode, using a secondary OCR engine if the primary one fails."""
+    secondary_ocr: Ocr = Ocr.ocr48px
+    """Secondary OCR to use in hybrid mode."""
     min_text_length: int = 0
     """Minimum text length of a text region"""
     ignore_bubble: int = 0
     """The threshold for ignoring text in non bubble areas, with valid values ranging from 1 to 50, does not ignore others. Recommendation 5 to 10. If it is too low, normal bubble areas may be ignored, and if it is too large, non bubble areas may be considered normal bubbles"""
     prob: float | None = None
     """Minimum probability of a text region to be considered valid. If None, uses the model default."""
+    merge_gamma: float = 0.8
+    """Textline merge distance tolerance, higher is more tolerant."""
+    merge_sigma: float = 2.5
+    """Textline merge deviation tolerance, higher is more tolerant."""
 
 class Config(BaseModel):
     # General

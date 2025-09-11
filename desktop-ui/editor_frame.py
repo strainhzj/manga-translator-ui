@@ -736,8 +736,11 @@ class EditorFrame(ctk.CTkFrame):
         # 保存当前用户编辑的蒙版状态
         current_edited_mask = self.refined_mask.copy()
         
-        # 异步更新蒙版
-        self.async_service.submit_task(self._update_refined_mask_with_config(current_edited_mask))
+        # 获取最新的完整配置
+        latest_config = self.config_service.get_config()
+        
+        # 异步更新蒙版，并传递最新配置
+        self.async_service.submit_task(self._update_refined_mask_with_config(current_edited_mask, latest_config))
 
     def _load_mask_settings_from_config(self):
         """从配置服务加载蒙版设置并更新UI"""

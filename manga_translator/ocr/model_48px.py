@@ -48,8 +48,20 @@ class Model48pxOCR(OfflineOCR):
             dictionary = [s[:-1] for s in fp.readlines()]
 
         self.model = OCR(dictionary, 768)
-        sd = torch.load(self._get_file_path('ocr_ar_48px.ckpt'))
-        self.model.load_state_dict(sd)
+        sd = torch.load(self._get_file_path('ocr_ar_48px.ckpt'), map_location='cpu', weights_only=False)
+        # Handle PyTorch Lightning checkpoint format
+        if 'state_dict' in sd:
+            sd = sd['state_dict']
+        
+        # Remove 'model.' prefix from keys if present
+        cleaned_sd = {}
+        for k, v in sd.items():
+            if k.startswith('model.'):
+                cleaned_sd[k[6:]] = v
+            else:
+                cleaned_sd[k] = v
+
+        self.model.load_state_dict(cleaned_sd)
         self.model.eval()
         self.device = device
         if (device == 'cuda' or device == 'mps'):

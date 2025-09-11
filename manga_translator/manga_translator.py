@@ -771,6 +771,26 @@ class MangaTranslator:
         if self.verbose and ctx.mask_raw is not None:
             imwrite_unicode(self._result_path('mask_raw.png'), ctx.mask_raw, logger)
 
+        # --- BEGIN: Save raw detection boxes image in verbose mode ---
+        if self.verbose and ctx.textlines:
+            try:
+                logger.info("Verbose mode: Saving raw detection boxes image...")
+                raw_detection_image = np.copy(ctx.img_rgb)
+                for textline in ctx.textlines:
+                    # Draw each polygon with a unique color to distinguish them
+                    # Using a simple hash of the textline object to get a color
+                    color_val = hash(str(textline.pts)) % (256 * 256 * 256)
+                    color = (color_val & 0xFF, (color_val >> 8) & 0xFF, (color_val >> 16) & 0xFF)
+                    cv2.polylines(raw_detection_image, [textline.pts.astype(np.int32)], isClosed=True, color=color, thickness=2)
+                
+                # Convert to BGR for saving with OpenCV
+                raw_detection_image_bgr = cv2.cvtColor(raw_detection_image, cv2.COLOR_RGB2BGR)
+                imwrite_unicode(self._result_path('detection_raw_boxes.png'), raw_detection_image_bgr, logger)
+                logger.info("Saved raw detection boxes to detection_raw_boxes.png")
+            except Exception as e:
+                logger.error(f"Failed to save raw detection boxes image: {e}")
+        # --- END: Save raw detection boxes image ---
+
         if not ctx.textlines:
             await self._report_progress('skip-no-regions', True)
             # If no text was found result is intermediate image product
@@ -1093,7 +1113,34 @@ class MangaTranslator:
             os.environ['MANGA_OCR_RESULT_DIR'] = ocr_result_dir
         
         try:
-            textlines = await dispatch_ocr(config.ocr.ocr, ctx.img_rgb, ctx.textlines, config.ocr, self.device, self.verbose)
+            # --- Primary OCR run ---
+            primary_ocr_engine = config.ocr.ocr
+            logger.info(f"Running primary OCR with: {primary_ocr_engine.value}")
+            textlines = await dispatch_ocr(primary_ocr_engine, ctx.img_rgb, ctx.textlines, config.ocr, self.device, self.verbose)
+
+            # --- BEGIN: HYBRID OCR LOGIC ---
+            if config.ocr.use_hybrid_ocr:
+                # Identify textlines that failed recognition
+                failed_indices = [i for i, tl in enumerate(textlines) if not tl.text.strip()]
+                
+                if failed_indices:
+                    failed_textlines = [ctx.textlines[i] for i in failed_indices]
+                    logger.info(f"{len(failed_textlines)} textlines failed with primary OCR. Trying secondary OCR...")
+                    
+                    secondary_ocr_engine = config.ocr.secondary_ocr
+                    # We can reuse the same config object, just switching the engine
+                    secondary_config = config.ocr
+                    
+                    logger.info(f"Running secondary OCR with: {secondary_ocr_engine.value}")
+                    secondary_results = await dispatch_ocr(secondary_ocr_engine, ctx.img_rgb, failed_textlines, secondary_config, self.device, self.verbose)
+                    
+                    # Merge the results back into the original list
+                    for i, result_tl in zip(failed_indices, secondary_results):
+                        textlines[i] = result_tl # Replace the failed textline with the new result
+                    
+                    logger.info("Secondary OCR processing finished.")
+            # --- END: HYBRID OCR LOGIC ---
+
         finally:
             # 恢复环境变量
             if old_ocr_dir is not None:
@@ -1115,7 +1162,7 @@ class MangaTranslator:
         current_time = time.time()
         self._model_usage_timestamps[("textline_merge", "textline_merge")] = current_time
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],
-                                                     verbose=self.verbose)
+                                                     config, verbose=self.verbose)
         for region in text_regions:
             if not hasattr(region, "text_raw"):
                 region.text_raw = region.text      # <- Save the initial OCR results to expand the render detection box. Also, prevent affecting the forbidden translation function.       
@@ -1143,7 +1190,7 @@ class MangaTranslator:
             ctx.textlines = filtered_textlines  
     
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],  
-                                                     verbose=self.verbose)  
+                                                     config, verbose=self.verbose)  
 
         new_text_regions = []
         for region in text_regions:

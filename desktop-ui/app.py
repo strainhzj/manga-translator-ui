@@ -556,6 +556,10 @@ class AppController:
             "min_text_length": "最小文本长度",
             "ignore_bubble": "忽略非气泡文本",
             "prob": "文本区域最低概率 (prob)",
+            "merge_gamma": "合并-距离容忍度",
+            "merge_sigma": "合并-离群容忍度",
+            "use_hybrid_ocr": "启用混合OCR",
+            "secondary_ocr": "备用OCR",
             "kernel_size": "卷积核大小",
             "mask_dilation_offset": "遮罩扩张偏移",
             "filter_text": "过滤文本 (Regex)",
@@ -849,7 +853,8 @@ class AppController:
             "colorizer": [member.value for member in Colorizer],
             "inpainter": [member.value for member in Inpainter],
             "inpainting_precision": [member.value for member in InpaintPrecision],
-            "ocr": [member.value for member in Ocr]
+            "ocr": [member.value for member in Ocr],
+            "secondary_ocr": [member.value for member in Ocr]
         }.get(key, None)
         
         # 特殊处理翻译器选项，将chatgpt显示为openai

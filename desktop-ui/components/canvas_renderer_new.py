@@ -102,6 +102,9 @@ class CanvasRenderer:
         self.transform_service.set_transform(zoom_level, x_offset, y_offset)
 
     def redraw_mask_overlay(self):
+        if self.image is None: # Add this check
+            return # Do nothing if there is no image
+
         self.canvas.delete("mask_overlay")
         self.canvas.delete("removed_mask_overlay")
         

@@ -181,7 +181,7 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
         # yield overall bbox and sorted indices
         yield txtlns, (fg_r, fg_g, fg_b), (bg_r, bg_g, bg_b)
 
-async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False) -> List[TextBlock]:
+async def dispatch(textlines: List[Quadrilateral], width: int, height: int, config, verbose: bool = False) -> List[TextBlock]:
     # print(width, height)
     # import re
     # for l in textlines:
