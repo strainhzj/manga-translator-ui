@@ -125,7 +125,7 @@ jobs:
         echo "$TUF_TIMESTAMP_KEY" > "$KEYS_DIR/timestamp"
         echo "Private keys restored."
 
-    """    - name: Update TUF Repository
+        - name: Update TUF Repository
       run: |
         python build_packages.py ${{ github.ref_name }} --update-repo --skip-build
 
@@ -191,4 +191,3 @@ jobs:
         files: release_assets/*
         draft: false
         prerelease: false
-""
