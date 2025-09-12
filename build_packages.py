@@ -13,7 +13,8 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Try to import tufup, and provide a helpful error message if it's not installed.
 try:
-    from tufup.repo import Repository
+    from tufup.repo import Repository, make_gztar_archive
+    from tufup.common import TargetMeta, KEY_REQUIRED, Patcher, SUFFIX_PATCH
 except ImportError:
     print("Error: tufup library not found. Please install it with: pip install tufup")
     sys.exit(1)
