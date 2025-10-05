@@ -305,17 +305,28 @@
 
 #### 常用路径
 
-**GPT配置文件路径**（GPT配置文件路径）：
+**GPT配置文件路径**：
 - 默认：`examples/gpt_config-example.yaml`
 - 用于配置 OpenAI/Gemini API 密钥和参数
 - 示例文件包含 API Key、模型名称、代理设置等
 
-**高质量翻译提示词**（高质量翻译提示词）：
-- 默认：`dict/prompt_example.json`
-- 用于高质量翻译器（OpenAI HQ/Gemini HQ）的提示词配置
-- 可以自定义翻译风格和术语表
+**提示词路径**（`dict` 目录）：
+- **系统提示词**（程序内置，自动调用）：
+  - `dict/system_prompt_hq.json` - 高质量翻译的系统提示词
+  - `dict/system_prompt_line_break.json` - AI断句的系统提示词
+- **用户自定义提示词**（在界面中选择）：
+  - `dict/prompt_example.json` - 提示词示例
+  - `dict/wyxxl.json` - 另一个提示词示例
+  - 可以在此目录添加自己的 `.json` 提示词文件
+- 用于高质量翻译器（OpenAI HQ/Gemini HQ）
+- 可以自定义翻译风格、术语表、上下文说明等
 
-**字体路径**（字体路径）：
+**导出原文模版路径**：
+- 默认：`examples/translation_template.json`
+- 用于自定义导出原文的格式
+- 定义一组文本框的结构，程序会自动重复应用
+
+**字体路径**：
 - 默认：`fonts` 目录
 - 可以指定具体字体文件路径（如 `fonts/my_font.ttf`）
 - 支持 `.ttf` 和 `.otf` 格式
