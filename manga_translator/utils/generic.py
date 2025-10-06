@@ -605,6 +605,46 @@ class Quadrilateral(object):
         return self.polygon.area
 
     def poly_distance(self, other) -> float:
+        """计算两个框之间的距离,优先使用平行边的中点距离"""
+        # 获取方向
+        dir_a = self.assigned_direction if self.assigned_direction is not None else self.direction
+        dir_b = other.assigned_direction if other.assigned_direction is not None else other.direction
+
+        # 如果方向一致,计算平行边的中点距离
+        if dir_a == dir_b:
+            if dir_a == 'h':  # 水平文本
+                # 计算上边和下边的中点
+                # self.pts: [左上, 右上, 右下, 左下]
+                self_top_mid = ((self.pts[0][0] + self.pts[1][0]) / 2, (self.pts[0][1] + self.pts[1][1]) / 2)
+                self_bottom_mid = ((self.pts[2][0] + self.pts[3][0]) / 2, (self.pts[2][1] + self.pts[3][1]) / 2)
+                other_top_mid = ((other.pts[0][0] + other.pts[1][0]) / 2, (other.pts[0][1] + other.pts[1][1]) / 2)
+                other_bottom_mid = ((other.pts[2][0] + other.pts[3][0]) / 2, (other.pts[2][1] + other.pts[3][1]) / 2)
+
+                # 计算四种组合的距离,取最小值
+                distances = [
+                    np.sqrt((self_top_mid[0] - other_top_mid[0])**2 + (self_top_mid[1] - other_top_mid[1])**2),
+                    np.sqrt((self_top_mid[0] - other_bottom_mid[0])**2 + (self_top_mid[1] - other_bottom_mid[1])**2),
+                    np.sqrt((self_bottom_mid[0] - other_top_mid[0])**2 + (self_bottom_mid[1] - other_top_mid[1])**2),
+                    np.sqrt((self_bottom_mid[0] - other_bottom_mid[0])**2 + (self_bottom_mid[1] - other_bottom_mid[1])**2),
+                ]
+                return min(distances)
+            else:  # 垂直文本 (dir_a == 'v')
+                # 计算左边和右边的中点
+                self_left_mid = ((self.pts[0][0] + self.pts[3][0]) / 2, (self.pts[0][1] + self.pts[3][1]) / 2)
+                self_right_mid = ((self.pts[1][0] + self.pts[2][0]) / 2, (self.pts[1][1] + self.pts[2][1]) / 2)
+                other_left_mid = ((other.pts[0][0] + other.pts[3][0]) / 2, (other.pts[0][1] + other.pts[3][1]) / 2)
+                other_right_mid = ((other.pts[1][0] + other.pts[2][0]) / 2, (other.pts[1][1] + other.pts[2][1]) / 2)
+
+                # 计算四种组合的距离,取最小值
+                distances = [
+                    np.sqrt((self_left_mid[0] - other_left_mid[0])**2 + (self_left_mid[1] - other_left_mid[1])**2),
+                    np.sqrt((self_left_mid[0] - other_right_mid[0])**2 + (self_left_mid[1] - other_right_mid[1])**2),
+                    np.sqrt((self_right_mid[0] - other_left_mid[0])**2 + (self_right_mid[1] - other_left_mid[1])**2),
+                    np.sqrt((self_right_mid[0] - other_right_mid[0])**2 + (self_right_mid[1] - other_right_mid[1])**2),
+                ]
+                return min(distances)
+
+        # 如果方向不一致,使用Shapely的多边形距离
         return self.polygon.distance(other.polygon)
 
     def distance(self, other, rho = 0.5) -> float:
@@ -618,13 +658,18 @@ class Quadrilateral(object):
         # x1, y1, w1, h1 = b1.x, b1.y, b1.w, b1.h
         # x2, y2, w2, h2 = b2.x, b2.y, b2.w, b2.h
         # return rect_distance(x1, y1, x1 + w1, y1 + h1, x2, y2, x2 + w2, y2 + h2)
+
+        # 如果没有assigned_direction,使用direction作为回退
+        dir_a = self.assigned_direction if self.assigned_direction is not None else self.direction
+        dir_b = other.assigned_direction if other.assigned_direction is not None else other.direction
+
         pattern = ''
-        if self.assigned_direction == 'h':
+        if dir_a == 'h' and dir_b == 'h':
             pattern = 'h_left'
         else:
             pattern = 'v_top'
         fs = max(self.font_size, other.font_size)
-        if self.assigned_direction == 'h':
+        if dir_a == 'h' and dir_b == 'h':
             poly1 = MultiPoint([tuple(self.pts[0]), tuple(self.pts[3]), tuple(other.pts[0]), tuple(other.pts[3])]).convex_hull
             poly2 = MultiPoint([tuple(self.pts[2]), tuple(self.pts[1]), tuple(other.pts[2]), tuple(other.pts[1])]).convex_hull
             poly3 = MultiPoint([
@@ -741,7 +786,7 @@ def distance_point_lineseg(p: np.ndarray, p1: np.ndarray, p2: np.ndarray):
     dy = y - yy
     return np.sqrt(dx * dx + dy * dy)
 
-def quadrilateral_can_merge_region(a: Quadrilateral, b: Quadrilateral, ratio = 1.9, discard_connection_gap = 2, char_gap_tolerance = 0.6, char_gap_tolerance2 = 1.5, font_size_ratio_tol = 1.5, aspect_ratio_tol = 2) -> bool:
+def quadrilateral_can_merge_region(a: Quadrilateral, b: Quadrilateral, ratio = 1.9, discard_connection_gap = 2, char_gap_tolerance = 0.6, char_gap_tolerance2 = 1.5, font_size_ratio_tol = 1.5, aspect_ratio_tol = 2, debug = False) -> bool:
     b1 = a.aabb
     b2 = b.aabb
     char_size = min(a.font_size, b.font_size)
@@ -751,41 +796,92 @@ def quadrilateral_can_merge_region(a: Quadrilateral, b: Quadrilateral, ratio = 1
     p1 = Polygon(a.pts)
     p2 = Polygon(b.pts)
     dist = p1.distance(p2)
+
+    if debug:
+        print(f"\n[MERGE_DEBUG] 检查合并:")
+        print(f"  框A: 中心({a.centroid[0]:.0f},{a.centroid[1]:.0f}) 字体{a.font_size:.0f} 角度{np.rad2deg(a.angle):.1f}°")
+        print(f"  框B: 中心({b.centroid[0]:.0f},{b.centroid[1]:.0f}) 字体{b.font_size:.0f} 角度{np.rad2deg(b.angle):.1f}°")
+        print(f"  多边形距离: {dist:.1f} 阈值: {discard_connection_gap * char_size:.1f}")
+
     if dist > discard_connection_gap * char_size:
+        if debug:
+            print(f"  ❌ 距离过远")
         return False
     if max(a.font_size, b.font_size) / char_size > font_size_ratio_tol:
+        if debug:
+            print(f"  ❌ 字体大小差异过大: {max(a.font_size, b.font_size) / char_size:.2f} > {font_size_ratio_tol}")
         return False
     if a.aspect_ratio > aspect_ratio_tol and b.aspect_ratio < 1. / aspect_ratio_tol:
+        if debug:
+            print(f"  ❌ 宽高比不匹配 (A宽B窄)")
         return False
     if b.aspect_ratio > aspect_ratio_tol and a.aspect_ratio < 1. / aspect_ratio_tol:
+        if debug:
+            print(f"  ❌ 宽高比不匹配 (B宽A窄)")
         return False
     a_aa = a.is_approximate_axis_aligned
     b_aa = b.is_approximate_axis_aligned
     if a_aa and b_aa:
+        if debug:
+            print(f"  两框都轴对齐")
         if dist < char_size * char_gap_tolerance:
             if abs(x1 + w1 // 2 - (x2 + w2 // 2)) < char_gap_tolerance2:
+                if debug:
+                    print(f"  ✅ 中心对齐")
                 return True
             if w1 > h1 * ratio and h2 > w2 * ratio:
+                if debug:
+                    print(f"  ❌ 都是横向但不对齐")
                 return False
             if w2 > h2 * ratio and h1 > w1 * ratio:
+                if debug:
+                    print(f"  ❌ 都是横向但不对齐")
                 return False
             if w1 > h1 * ratio or w2 > h2 * ratio : # h
-                return abs(x1 - x2) < char_size * char_gap_tolerance2 or abs(x1 + w1 - (x2 + w2)) < char_size * char_gap_tolerance2
+                result = abs(x1 - x2) < char_size * char_gap_tolerance2 or abs(x1 + w1 - (x2 + w2)) < char_size * char_gap_tolerance2
+                if debug:
+                    print(f"  {'✅' if result else '❌'} 横向对齐检查")
+                return result
             elif h1 > w1 * ratio or h2 > w2 * ratio : # v
-                return abs(y1 - y2) < char_size * char_gap_tolerance2 or abs(y1 + h1 - (y2 + h2)) < char_size * char_gap_tolerance2
+                result = abs(y1 - y2) < char_size * char_gap_tolerance2 or abs(y1 + h1 - (y2 + h2)) < char_size * char_gap_tolerance2
+                if debug:
+                    print(f"  {'✅' if result else '❌'} 纵向对齐检查")
+                return result
+            if debug:
+                print(f"  ❌ 未通过对齐检查")
             return False
         else:
+            if debug:
+                print(f"  ❌ 距离过远 (轴对齐)")
             return False
     if True:#not a_aa and not b_aa:
+        if debug:
+            print(f"  非轴对齐检查")
         if abs(a.angle - b.angle) < 15 * np.pi / 180:
             fs_a = a.font_size
             fs_b = b.font_size
             fs = min(fs_a, fs_b)
-            if a.poly_distance(b) > fs * char_gap_tolerance2:
+            poly_dist = a.poly_distance(b)
+            if debug:
+                print(f"  角度差: {np.rad2deg(abs(a.angle - b.angle)):.1f}° < 15°")
+                print(f"  多边形距离: {poly_dist:.1f} 阈值: {fs * char_gap_tolerance2:.1f}")
+            if poly_dist > fs * char_gap_tolerance2:
+                if debug:
+                    print(f"  ❌ 多边形距离过远")
                 return False
-            if abs(fs_a - fs_b) / fs > 0.25:
+            font_diff = abs(fs_a - fs_b) / fs
+            if debug:
+                print(f"  字体差异: {font_diff:.3f} 阈值: 0.25")
+            if font_diff > 0.25:
+                if debug:
+                    print(f"  ❌ 字体差异过大")
                 return False
+            if debug:
+                print(f"  ✅ 可以合并")
             return True
+        else:
+            if debug:
+                print(f"  ❌ 角度差异过大: {np.rad2deg(abs(a.angle - b.angle)):.1f}° >= 15°")
     return False
 
 def quadrilateral_can_merge_region_coarse(a: Quadrilateral, b: Quadrilateral, discard_connection_gap = 2, font_size_ratio_tol = 0.7) -> bool:

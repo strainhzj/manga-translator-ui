@@ -357,7 +357,7 @@ class MainAppLogic(QObject):
                     "gpt_config": "GPT配置文件路径", "high_quality_prompt_path": "高质量翻译提示词", "use_mocr_merge": "使用MOCR合并",
                     "ocr": "OCR模型", "use_hybrid_ocr": "启用混合OCR", "secondary_ocr": "备用OCR",
                     "min_text_length": "最小文本长度", "ignore_bubble": "忽略非气泡文本", "prob": "文本区域最低概率 (prob)",
-                    "merge_gamma": "合并-距离容忍度", "merge_sigma": "合并-离群容忍度", "detector": "文本检测器",
+                    "merge_gamma": "合并-距离容忍度", "merge_sigma": "合并-离群容忍度", "merge_edge_ratio_threshold": "合并-边缘距离比例阈值", "detector": "文本检测器",
                     "detection_size": "检测大小", "text_threshold": "文本阈值", "det_rotate": "旋转图像进行检测",
                     "det_auto_rotate": "旋转图像以优先检测垂直文本行", "det_invert": "反转图像颜色进行检测",
                     "det_gamma_correct": "应用伽马校正进行检测", "box_threshold": "边界框生成阈值", "unclip_ratio": "Unclip比例",

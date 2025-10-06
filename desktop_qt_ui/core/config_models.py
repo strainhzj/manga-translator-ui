@@ -21,6 +21,7 @@ class OcrSettings(BaseModel):
     prob: float = 0.1
     merge_gamma: float = 0.8
     merge_sigma: float = 2.5
+    merge_edge_ratio_threshold: float = 0.0
 
 class DetectorSettings(BaseModel):
     detector: str = "default"

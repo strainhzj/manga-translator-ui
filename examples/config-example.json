@@ -22,12 +22,13 @@
     "ignore_bubble": 0,
     "prob": 0.1,
     "merge_gamma": 0.8,
-    "merge_sigma": 2.5
+    "merge_sigma": 2.5,
+    "merge_edge_ratio_threshold": "0"
   },
   "detector": {
     "detector": "default",
     "detection_size": 2048,
-    "text_threshold": "0.5",
+    "text_threshold": 0.5,
     "det_rotate": false,
     "det_auto_rotate": false,
     "det_invert": false,
@@ -73,10 +74,10 @@
     "colorizer": "none"
   },
   "cli": {
-    "verbose": false,
+    "verbose": true,
     "attempts": -1,
     "ignore_errors": false,
-    "use_gpu": false,
+    "use_gpu": true,
     "use_gpu_limited": false,
     "context_size": 3,
     "format": "不指定",

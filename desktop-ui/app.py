@@ -564,6 +564,7 @@ class AppController:
             "prob": "文本区域最低概率 (prob)",
             "merge_gamma": "合并-距离容忍度",
             "merge_sigma": "合并-离群容忍度",
+            "merge_edge_ratio_threshold": "合并-边缘距离比例阈值",
             "use_hybrid_ocr": "启用混合OCR",
             "secondary_ocr": "备用OCR",
             "kernel_size": "卷积核大小",

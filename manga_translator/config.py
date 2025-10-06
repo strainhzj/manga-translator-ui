@@ -348,6 +348,8 @@ class OcrConfig(BaseModel):
     """Textline merge distance tolerance, higher is more tolerant."""
     merge_sigma: float = 2.5
     """Textline merge deviation tolerance, higher is more tolerant."""
+    merge_edge_ratio_threshold: float = 0.0
+    """If a box has two neighbors with edge distance ratio > this value, disconnect the larger distance edge. 0 means disabled."""
 
 class Config(BaseModel):
     # General

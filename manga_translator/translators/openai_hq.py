@@ -3,6 +3,7 @@ import re
 import asyncio
 import base64
 import json
+import logging
 from io import BytesIO
 from typing import List, Dict, Any
 from PIL import Image
@@ -12,6 +13,10 @@ from openai import AsyncOpenAI
 from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import OPENAI_API_KEY, OPENAI_MODEL
 from ..utils import Context
+
+# 禁用openai库的DEBUG日志,避免打印base64图片数据
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def encode_image_for_openai(image, max_size=1024):
@@ -243,13 +248,6 @@ This is an incorrect response because it includes extra text and explanations.
         
         # 准备图片
         self.logger.info(f"高质量翻译模式：正在打包 {len(batch_data)} 张图片并发送...")
-        
-        # 打印图片信息
-        self.logger.info("--- Image Info ---")
-        for i, data in enumerate(batch_data):
-            image = data['image']
-            self.logger.info(f"Image {i+1}: size={image.size}, mode={image.mode}")
-        self.logger.info("--------------------")
 
         image_contents = []
         for data in batch_data:
