@@ -1,6 +1,6 @@
 {
   "app": {
-    "last_open_dir": ".",
+    "last_open_dir": "",
     "last_output_path": ""
   },
   "filter_text": null,
@@ -37,10 +37,11 @@
     "unclip_ratio": 2.5,
     "use_yolo_obb": true,
     "yolo_obb_conf": 0.4,
-    "yolo_obb_iou": 0.6
+    "yolo_obb_iou": 0.6,
+    "yolo_obb_overlap_threshold": 0.1
   },
   "inpainter": {
-    "inpainter": "lama_large",
+    "inpainter": "lama_mpe",
     "inpainting_size": 2048,
     "inpainting_precision": "bf16"
   },
@@ -66,7 +67,8 @@
     "max_font_size": 0,
     "font_scale_ratio": 1.0,
     "center_text_in_bubble": false,
-    "optimize_line_breaks": true
+    "optimize_line_breaks": true,
+    "strict_smart_scaling": true
   },
   "upscale": {
     "upscaler": "waifu2x",
@@ -78,7 +80,7 @@
     "colorizer": "none"
   },
   "cli": {
-    "verbose": false,
+    "verbose": true,
     "attempts": 2,
     "ignore_errors": false,
     "use_gpu": true,

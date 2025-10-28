@@ -146,16 +146,33 @@ def compact_special_symbols(text: str) -> str:
     text = text.replace('...', '…')  
     text = text.replace('..', '…')
     # Remove half-width and full-width spaces after each punctuation mark
-    pattern = r'([^WSws])[ 　]+'  
+    # 只删除标点符号后的空格，不删除字母/数字后的空格
+    # 匹配常见的标点符号：。，、！？；：…等
+    pattern = r'([。，、！？；：…—～「」『』【】（）《》〈〉.,!?;:\-])[ 　]+'  
     text = re.sub(pattern, r'\1', text) 
     return text
 
 def auto_add_horizontal_tags(text: str) -> str:
-    """自动为竖排文本中的短英文单词或连续符号添加<H>标签，使其横向显示。"""
+    """自动为竖排文本中的短英文单词或连续符号添加<H>标签，使其横向显示。
+    注意：跳过多词英文词组（如 "Tek Tok"），只处理独立的短英文单词。"""
     # 如果文本中已有<H>标签，则不进行处理，以尊重手动设置
     if '<H>' in text:
         return text
 
+    # 步骤1：先保护多词英文词组（至少2个单词，用空格分隔）
+    # 匹配：字母/数字 + 空格 + 字母/数字（可以重复多次）
+    multi_word_pattern = r'[a-zA-Z0-9\uff21-\uff3a\uff41-\uff5a\uff10-\uff19_.-]+(?:\s+[a-zA-Z0-9\uff21-\uff3a\uff41-\uff5a\uff10-\uff19_.-]+)+'
+    
+    # 用占位符保护多词词组
+    protected_phrases = []
+    def protect_phrase(match):
+        placeholder = f"<<<PHRASE_{len(protected_phrases)}>>>"
+        protected_phrases.append(match.group(0))
+        return placeholder
+    
+    text = re.sub(multi_word_pattern, protect_phrase, text)
+    
+    # 步骤2：对剩余的独立短英文单词添加<H>标签
     # This regex finds sequences of 2-4 ASCII/full-width letters, numbers, or specific symbols,
     # OR sequences of 2 or more exclamation/question marks (full or half-width).
     # Full-width ranges: \uff21-\uff3a (A-Z), \uff41-\uff5a (a-z), \uff10-\uff19 (0-9)
@@ -170,7 +187,13 @@ def auto_add_horizontal_tags(text: str) -> str:
         else:
             return f"<H>{match.group(0)}</H>"
 
-    return pattern.sub(replacer, text)
+    text = pattern.sub(replacer, text)
+    
+    # 步骤3：恢复被保护的多词词组
+    for i, phrase in enumerate(protected_phrases):
+        text = text.replace(f"<<<PHRASE_{i}>>>", phrase)
+    
+    return text
     
 def rotate_image(image, angle):
     if angle == 0:

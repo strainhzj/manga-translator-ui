@@ -174,6 +174,8 @@ class RenderConfig(BaseModel):
     """Center the entire text block in the bubble when AI line breaking is enabled"""
     optimize_line_breaks: bool = False
     """Automatically optimize line breaks by testing all combinations to find the best font size"""
+    strict_smart_scaling: bool = False
+    """In smart_scaling mode, prevent text box expansion by skipping combinations without line breaks"""
     direction: Direction = Direction.auto
     """Force text to be rendered horizontally/vertically/none"""
     uppercase: bool = False
@@ -320,6 +322,8 @@ class DetectorConfig(BaseModel):
     """Confidence threshold for YOLO OBB detector"""
     yolo_obb_iou: float = 0.6
     """IoU threshold for YOLO OBB detector NMS"""
+    yolo_obb_overlap_threshold: float = 0.1
+    """Overlap ratio threshold for removing YOLO boxes (0.0-1.0). YOLO boxes with overlap >= threshold will be removed if they don't meet replacement criteria. Set to 1.0 to keep all overlapping boxes."""
     box_threshold: float = 0.7
     """Threshold for bbox generation"""
     unclip_ratio: float = 2.3

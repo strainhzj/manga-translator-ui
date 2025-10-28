@@ -55,6 +55,7 @@ class DetectorSettings(BaseModel):
     use_yolo_obb: bool = False
     yolo_obb_conf: float = 0.4
     yolo_obb_iou: float = 0.6
+    yolo_obb_overlap_threshold: float = 0.1
 
 class InpainterSettings(BaseModel):
     inpainter: str = "lama_mpe"
@@ -84,6 +85,7 @@ class RenderSettings(BaseModel):
     font_scale_ratio: float = 1.0
     center_text_in_bubble: bool = False
     optimize_line_breaks: bool = False
+    strict_smart_scaling: bool = False
 
 class UpscaleSettings(BaseModel):
     upscaler: str = "esrgan"

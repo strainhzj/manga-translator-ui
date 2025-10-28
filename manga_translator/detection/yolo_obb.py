@@ -68,7 +68,7 @@ class YOLOOBBDetector(OfflineDetector):
         Returns:
             resized_img: 调整后的图像
             gain: 缩放比例
-            (pad_w, pad_h): 填充的宽度和高度（像素）
+            (pad_w, pad_h): 填充的宽度和高度（左/上的填充像素）
         """
         shape = img.shape[:2]  # 当前形状 [height, width]
         
@@ -79,41 +79,70 @@ class YOLOOBBDetector(OfflineDetector):
         new_unpad_w = int(round(shape[1] * gain))
         new_unpad_h = int(round(shape[0] * gain))
         
-        # 计算padding（分成两边）
-        pad_w = round((new_shape[1] - new_unpad_w) / 2 - 0.1)
-        pad_h = round((new_shape[0] - new_unpad_h) / 2 - 0.1)
-        
         # Resize图像
         if (new_unpad_w, new_unpad_h) != (shape[1], shape[0]):
             img = cv2.resize(img, (new_unpad_w, new_unpad_h), interpolation=cv2.INTER_LINEAR)
         
+        # 计算需要的总padding
+        dw = new_shape[1] - new_unpad_w  # 宽度方向需要的总padding
+        dh = new_shape[0] - new_unpad_h  # 高度方向需要的总padding
+        
+        # 将padding分配到两边（确保总和精确）
+        # 一边向下取整，一边是剩余部分，确保 left + right = dw
+        left = dw // 2
+        right = dw - left
+        top = dh // 2
+        bottom = dh - top
+        
         # 添加边框
-        top, bottom = int(pad_h), int(pad_h)
-        left, right = int(pad_w), int(pad_w)
         img = cv2.copyMakeBorder(
             img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color
         )
         
-        return img, gain, (pad_w, pad_h)
+        # 验证最终尺寸
+        assert img.shape[0] == new_shape[0] and img.shape[1] == new_shape[1], \
+            f"Letterbox failed: expected {new_shape}, got {img.shape[:2]}"
+        
+        # 返回左和上的padding（用于后续坐标转换）
+        return img, gain, (float(left), float(top))
     
     def preprocess(self, img: np.ndarray) -> Tuple[np.ndarray, float, Tuple[float, float]]:
         """预处理图像"""
+        # 检查图像通道数并转换为RGB格式
+        if len(img.shape) == 2:
+            # 灰度图 -> RGB
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            self.logger.debug(f"YOLO OBB: 灰度图转RGB, shape={img.shape}")
+        elif len(img.shape) == 3:
+            if img.shape[2] == 4:
+                # RGBA -> RGB
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+                self.logger.debug(f"YOLO OBB: RGBA转RGB, shape={img.shape}")
+            elif img.shape[2] == 3:
+                # 假设是BGR，需要转RGB（OpenCV默认BGR格式）
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            else:
+                self.logger.error(f"YOLO OBB: 不支持的图像通道数: {img.shape}")
+                raise ValueError(f"Unsupported image shape: {img.shape}")
+        else:
+            self.logger.error(f"YOLO OBB: 不支持的图像维度: {img.shape}")
+            raise ValueError(f"Unsupported image shape: {img.shape}")
+        
         img_resized, gain, pad = self.letterbox(
             img, 
             new_shape=(self.input_size, self.input_size)
         )
         
-        # 转换为 RGB
-        img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
-        
         # 转换为 CHW 格式
-        img_transposed = img_rgb.transpose(2, 0, 1)
+        img_transposed = img_resized.transpose(2, 0, 1)
         
         # 添加 batch 维度
         img_expanded = np.expand_dims(img_transposed, axis=0)
         
         # 归一化到 [0, 1]
         blob = img_expanded.astype(np.float32) / 255.0
+        
+        self.logger.debug(f"YOLO OBB预处理完成: blob shape={blob.shape}, dtype={blob.dtype}")
         
         return blob, gain, pad
     
@@ -364,13 +393,32 @@ class YOLOOBBDetector(OfflineDetector):
             raw_mask: None (YOLO OBB不生成mask)
             debug_img: None
         """
+        # 记录输入图像信息
+        self.logger.debug(f"YOLO OBB输入图像: shape={image.shape}, dtype={image.dtype}")
+        
         # 预处理
-        blob, gain, pad = self.preprocess(image)
+        try:
+            blob, gain, pad = self.preprocess(image)
+        except Exception as e:
+            self.logger.error(f"YOLO OBB预处理失败: {e}, 输入图像shape={image.shape}")
+            raise
         
         # 推理
         input_name = self.session.get_inputs()[0].name
         output_names = [output.name for output in self.session.get_outputs()]
-        outputs = self.session.run(output_names, {input_name: blob})
+        
+        # 记录模型输入信息
+        model_input = self.session.get_inputs()[0]
+        self.logger.debug(f"YOLO OBB模型期望输入: name={model_input.name}, shape={model_input.shape}")
+        self.logger.debug(f"YOLO OBB实际输入: shape={blob.shape}, dtype={blob.dtype}")
+        
+        try:
+            outputs = self.session.run(output_names, {input_name: blob})
+        except Exception as e:
+            self.logger.error(f"YOLO OBB推理失败: {e}")
+            self.logger.error(f"输入blob shape: {blob.shape}, dtype: {blob.dtype}")
+            self.logger.error(f"模型期望shape: {model_input.shape}")
+            raise
         
         # 后处理
         img_shape = image.shape[:2]

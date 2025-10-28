@@ -1165,7 +1165,7 @@ class MangaTranslator:
                                         config.detector.unclip_ratio, config.detector.det_invert, config.detector.det_gamma_correct, config.detector.det_rotate,
                                         config.detector.det_auto_rotate,
                                         self.device, self.verbose,
-                                        config.detector.use_yolo_obb, config.detector.yolo_obb_conf, config.detector.yolo_obb_iou)
+                                        config.detector.use_yolo_obb, config.detector.yolo_obb_conf, config.detector.yolo_obb_iou, config.detector.yolo_obb_overlap_threshold)
         
         # 处理bbox调试图（如果检测器返回了）
         if self.verbose and result and len(result) == 3 and result[2] is not None:
@@ -1202,12 +1202,20 @@ class MangaTranslator:
                     result = (result[0], result[1], None)
                 except Exception as e:
                     logger.error(f'Failed to save bbox debug images: {e}')
-            # 兼容单张图的情况
+            # 兼容单张图的情况（包括混合检测调试图）
             elif isinstance(third_elem, np.ndarray) and len(third_elem.shape) == 3:
                 try:
-                    bbox_debug_path = self._result_path('bboxes_with_scores.png')
-                    imwrite_unicode(bbox_debug_path, third_elem, logger)
-                    logger.info(f'Saved bbox debug image to {bbox_debug_path}')
+                    # 如果启用了YOLO辅助检测，优先保存为混合检测调试图
+                    if config.detector.use_yolo_obb:
+                        # 保存混合检测调试图
+                        hybrid_debug_path = self._result_path('hybrid_detection_boxes.png')
+                        imwrite_unicode(hybrid_debug_path, cv2.cvtColor(third_elem, cv2.COLOR_RGB2BGR), logger)
+                        logger.info(f'✅ 已保存混合检测调试图: {hybrid_debug_path}')
+                    else:
+                        # 保存普通bbox调试图
+                        bbox_debug_path = self._result_path('bboxes_with_scores.png')
+                        imwrite_unicode(bbox_debug_path, third_elem, logger)
+                        logger.info(f'Saved bbox debug image to {bbox_debug_path}')
                     result = (result[0], result[1], None)
                 except Exception as e:
                     logger.error(f'Failed to save bbox debug image: {e}')

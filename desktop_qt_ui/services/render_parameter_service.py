@@ -53,6 +53,7 @@ class RenderParameters:
     font_scale_ratio: float = 1.0  # 字体缩放比例
     center_text_in_bubble: bool = False  # AI断句时文本居中
     optimize_line_breaks: bool = False  # 自动优化断句
+    strict_smart_scaling: bool = False  # AI断句自动扩大文字下不扩大文本框
 
     # 效果参数
     stroke_width: float = 0.2  # 描边宽度

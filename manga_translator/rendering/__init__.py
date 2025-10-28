@@ -202,7 +202,8 @@ def optimize_line_breaks_for_region(region: TextBlock, config: Config, target_fo
     best_font_size = 0
     best_uniformity = float('inf')
     
-    logger.debug(f"[OPTIMIZE_LINE_BREAKS] Testing {len(combinations)} combinations")
+    layout_mode = config.render.layout_mode if config and hasattr(config.render, 'layout_mode') else 'default'
+    logger.debug(f"[OPTIMIZE_LINE_BREAKS] Testing {len(combinations)} combinations, layout_mode={layout_mode}")
     
     for text_variant, combo_desc, skip_reason in combinations:
         if skip_reason:
@@ -211,6 +212,13 @@ def optimize_line_breaks_for_region(region: TextBlock, config: Config, target_fo
         
         # Convert [BR] to \n for calculation
         text_for_calc = re.sub(r'\s*\[BR\]\s*', '\n', text_variant, flags=re.IGNORECASE)
+        
+        # 严格智能缩放模式：如果去掉所有断句（无\n），会导致文本框扩大，淘汰此方案
+        strict_smart_scaling = getattr(config.render, 'strict_smart_scaling', False) if config and hasattr(config, 'render') else False
+        if layout_mode == 'smart_scaling' and strict_smart_scaling:
+            if '\n' not in text_for_calc:
+                logger.debug(f"[OPTIMIZE_LINE_BREAKS] Skipping {combo_desc}: 严格智能缩放模式下无断句会扩大文本框")
+                continue
         
         try:
             # Calculate required dimensions
