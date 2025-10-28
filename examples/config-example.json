@@ -78,7 +78,7 @@
     "colorizer": "none"
   },
   "cli": {
-    "verbose": true,
+    "verbose": false,
     "attempts": 2,
     "ignore_errors": false,
     "use_gpu": true,

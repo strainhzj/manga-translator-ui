@@ -152,8 +152,8 @@ def generate_line_break_combinations(text: str):
             # Split first to check first segment length
             segments = re.split(pattern, text, flags=re.IGNORECASE)
             
-            # Check skip condition: if first segment has < 2 chars and we're removing break 0
-            if 0 in combo and len(segments[0].strip()) < 2:
+            # Check skip condition: if first segment has <= 2 chars and we're removing break 0
+            if 0 in combo and len(segments[0].strip()) <= 2:
                 skip_reason = "first_segment_too_short"
                 combinations.append((None, f"remove_{combo}", skip_reason))
                 continue
