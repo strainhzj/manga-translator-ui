@@ -1,13 +1,13 @@
 {
   "app": {
-    "last_open_dir": "",
-    "last_output_path": ""
+    "last_open_dir": "D:/xiazai/图片助手(ImageAssistant)_批量图片下载器/jmanga.tel/ねぇ、もういっそつき合っちゃう？幼馴染の美少女に頼まれて、カモフラ彼氏はじめました_-_34_raw_-_jmanga",
+    "last_output_path": "D:/xiazai/图片助手(ImageAssistant)_批量图片下载器/output"
   },
   "filter_text": null,
   "kernel_size": 3,
   "mask_dilation_offset": 70,
   "translator": {
-    "translator": "openai_hq",
+    "translator": "openai",
     "target_lang": "CHS",
     "no_text_lang_skip": false,
     "gpt_config": "../examples/gpt_config-example.yaml",

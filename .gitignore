@@ -115,3 +115,15 @@ test_colorize_only_mode.py
 
 # Ignore specific font file
 /fonts/字魂白鸽天行体(商用需授权).ttf
+
+# Ignore portable Git (users will download it)
+PortableGit/
+!PortableGit/.gitkeep
+!PortableGit/README.md
+
+# Ignore launch script temp files
+tmp/
+
+# Ignore virtual environment
+venv/
+.venv/
