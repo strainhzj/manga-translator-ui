@@ -18,14 +18,14 @@ onnx_binaries.extend([
 ])
 
 a = Analysis(
-    ['..\\desktop_qt_ui\\main.py'],  # 相对于packaging目录
+    ['../desktop_qt_ui/main.py'],  # 相对于packaging目录
     pathex=[],
     binaries=onnx_binaries,
     datas=py3langid_datas + unidic_datas + manga_ocr_datas + onnx_datas,  # 添加所有数据文件
     hiddenimports=['pydensecrf.eigen', 'bsdiff4.core', 'PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtWidgets', 'matplotlib', 'matplotlib.pyplot'] + onnx_hiddenimports,  # 添加隐式导入
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[os.path.abspath('..\\pyi_rth_onnxruntime.py')],
+    runtime_hooks=[os.path.join(os.path.dirname(__file__), 'pyi_rth_onnxruntime.py')],
     excludes=[],
     noarchive=False,
     optimize=0,
