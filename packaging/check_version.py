@@ -101,25 +101,47 @@ def main():
             print("")
             print("[发现新版本]")
             print("")
-            print("最新更新内容 (最近10条):")
-            print("----------------------------------------")
             
-            # 显示更新日志
-            try:
-                result = subprocess.run(
-                    [git_cmd, 'log', 'HEAD..origin/main', '--oneline', '--decorate', '--no-color', '-10'],
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
-                if result.returncode == 0 and result.stdout:
-                    print(result.stdout.strip())
-                else:
+            # 尝试读取远程 CHANGELOG
+            doc_dir = Path(__file__).parent.parent / "doc"
+            # 去除版本号中可能的 'v' 前缀
+            version_clean = remote_version.lstrip('v')
+            changelog_file = doc_dir / f"CHANGELOG_v{version_clean}.md"
+            
+            # 优先显示 CHANGELOG 文件
+            changelog_shown = False
+            if changelog_file.exists():
+                try:
+                    changelog_content = changelog_file.read_text(encoding='utf-8')
+                    print(f"版本 {version_clean} 更新内容:")
+                    print("========================================")
+                    print(changelog_content)
+                    print("========================================")
+                    changelog_shown = True
+                except Exception as e:
+                    print(f"[警告] 无法读取更新文档: {e}")
+            
+            # 如果没有 CHANGELOG 文件，显示 git log
+            if not changelog_shown:
+                print("最新更新内容 (最近10条):")
+                print("----------------------------------------")
+                
+                try:
+                    result = subprocess.run(
+                        [git_cmd, 'log', 'HEAD..origin/main', '--oneline', '--decorate', '--no-color', '-10'],
+                        capture_output=True,
+                        text=True,
+                        check=False
+                    )
+                    if result.returncode == 0 and result.stdout:
+                        print(result.stdout.strip())
+                    else:
+                        print("(无法获取更新日志)")
+                except Exception:
                     print("(无法获取更新日志)")
-            except Exception:
-                print("(无法获取更新日志)")
+                
+                print("----------------------------------------")
             
-            print("----------------------------------------")
             return 2  # 有更新
     
     return 0

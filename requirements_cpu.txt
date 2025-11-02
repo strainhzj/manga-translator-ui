@@ -27,11 +27,11 @@ loguru==0.7.3
 manga-ocr==0.1.14
 matplotlib==3.10.5
 networkx==3.5
-numpy==2.2.6
+numpy>=2.0,<2.3
 omegaconf==2.3.0
 onnxruntime==1.20.1
 openai==1.63.0
-opencv-python==4.9.0.80
+opencv-contrib-python>=4.10.0
 packaging<25.0
 pandas==2.3.1
 Pillow==11.3.0
@@ -61,11 +61,11 @@ websockets==14.2
 google-generativeai==0.8.5
 # pydensecrf - 预编译 wheel 文件 (Python 3.12 Windows)
 # 国内用户推荐使用镜像站,下载速度更快
-https://gh-proxy.com/https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.6/pydensecrf-1.0-cp312-cp312-win_amd64.whl
+pydensecrf @ https://gh-proxy.com/https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.6/pydensecrf-1.0-cp312-cp312-win_amd64.whl
 # 如果镜像站失效,可使用官方源:
-# https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.6/pydensecrf-1.0-cp312-cp312-win_amd64.whl
+# pydensecrf @ https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.6/pydensecrf-1.0-cp312-cp312-win_amd64.whl
 # 或从源码安装(需要 C++ 编译工具):
-# git+https://github.com/lucasb-eyer/pydensecrf.git
+# pydensecrf @ git+https://github.com/lucasb-eyer/pydensecrf.git
 deepl==1.22.0
 groq==0.31.0
 torchsummary==1.5.1
