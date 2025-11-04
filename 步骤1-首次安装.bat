@@ -38,9 +38,24 @@ if %ERRORLEVEL% == 0 (
     set PATH_HAS_CHINESE=1
 )
 
+REM 先检查系统是否已有conda（全局安装）
+where conda >nul 2>&1
+if %ERRORLEVEL% == 0 (
+    set CONDA_INSTALLED=1
+    echo [OK] 检测到系统已安装 Conda
+    for /f "delims=" %%i in ('where conda') do (
+        echo 位置: %%i
+        goto :conda_found
+    )
+    :conda_found
+    conda --version
+    goto :check_git
+)
+
+REM 检查本地Miniconda
 if exist "%MINICONDA_ROOT%\Scripts\conda.exe" (
     set CONDA_INSTALLED=1
-    echo [OK] 检测到 Miniconda 已安装
+    echo [OK] 检测到本地 Miniconda 已安装
     echo 位置: %MINICONDA_ROOT%
     call "%MINICONDA_ROOT%\Scripts\conda.exe" --version
     goto :check_git
