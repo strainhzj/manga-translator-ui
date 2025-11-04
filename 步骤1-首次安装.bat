@@ -36,7 +36,6 @@ if errorlevel 1 (
     REM 路径包含中文，使用磁盘根目录
     set MINICONDA_ROOT=%~d0\Miniconda3
     set PATH_HAS_CHINESE=1
-    echo [DEBUG-DETECT] 检测到非ASCII路径，设置 PATH_HAS_CHINESE=1
 )
 
 REM 先检查系统是否已有conda（全局安装）
