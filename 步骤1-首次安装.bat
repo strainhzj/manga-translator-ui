@@ -32,10 +32,11 @@ REM 检测路径是否包含非ASCII字符（中文等）
 REM 使用PowerShell进行更可靠的检测
 set "TEMP_CHECK_PATH=%CD%"
 powershell -Command "$path = '%TEMP_CHECK_PATH%'; if ($path -match '[^\x00-\x7F]') { exit 1 } else { exit 0 }" >nul 2>&1
-if !ERRORLEVEL! neq 0 (
+if errorlevel 1 (
     REM 路径包含中文，使用磁盘根目录
     set MINICONDA_ROOT=%~d0\Miniconda3
     set PATH_HAS_CHINESE=1
+    echo [DEBUG-DETECT] 检测到非ASCII路径，设置 PATH_HAS_CHINESE=1
 )
 
 REM 先检查系统是否已有conda（全局安装）
