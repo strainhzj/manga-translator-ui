@@ -142,23 +142,22 @@ class RealCUGANUpscaler(OfflineUpscaler):
         logger.info(f'Loading Real-CUGAN model from {model_path}')
         
         try:
-            # Import from project root models directory
+            # Import from project root models directory using BASE_PATH
             import sys
             import importlib.util
-            from pathlib import Path
+            from ..utils.generic import BASE_PATH
             
-            project_root = Path(__file__).parent.parent.parent
-            logger.info(f'Project root: {project_root}')
+            logger.info(f'BASE_PATH: {BASE_PATH}')
             
-            models_path = project_root / 'models'
+            models_path = os.path.join(BASE_PATH, 'models')
             logger.info(f'Models path: {models_path}')
-            logger.info(f'Models path exists: {models_path.exists()}')
+            logger.info(f'Models path exists: {os.path.exists(models_path)}')
             
-            upcunet_path = models_path / 'RealCUGAN' / 'upcunet_v3.py'
+            upcunet_path = os.path.join(models_path, 'RealCUGAN', 'upcunet_v3.py')
             logger.info(f'Upcunet path: {upcunet_path}')
-            logger.info(f'Upcunet path exists: {upcunet_path.exists()}')
+            logger.info(f'Upcunet path exists: {os.path.exists(upcunet_path)}')
             
-            if not upcunet_path.exists():
+            if not os.path.exists(upcunet_path):
                 raise FileNotFoundError(f'upcunet_v3.py not found at {upcunet_path}')
             
             # Load module dynamically
