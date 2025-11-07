@@ -316,6 +316,7 @@ class RegionTextItem(QGraphicsItemGroup):
 
     def _get_core_polygon_path(self) -> QPainterPath:
         path = QPainterPath()
+        path.setFillRule(Qt.FillRule.WindingFill)  # 设置填充规则
         seen_polygons = set()
 
         # 调试:记录是否打印过日志
@@ -335,6 +336,7 @@ class RegionTextItem(QGraphicsItemGroup):
                 polygon_tuple = tuple((p.x(), p.y()) for p in poly)
                 if polygon_tuple not in seen_polygons:
                     path.addPolygon(poly)
+                    path.closeSubpath()  # 确保路径闭合
                     seen_polygons.add(polygon_tuple)
         return path
 

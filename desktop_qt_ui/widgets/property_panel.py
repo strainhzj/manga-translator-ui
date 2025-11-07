@@ -214,8 +214,37 @@ class PropertyPanel(QWidget):
         style_content_widget = QWidget()
         style_layout = QFormLayout(style_content_widget)
         
-        # Font family selector
-        self.font_family_combo = QComboBox()
+        # Font family selector with refresh capability
+        class RefreshableComboBox(QComboBox):
+            """可刷新的下拉框，在下拉时自动刷新字体列表"""
+            def __init__(self, parent_widget, parent=None):
+                super().__init__(parent)
+                self.parent_widget = parent_widget
+            
+            def showPopup(self):
+                # 保存当前选中的文本
+                current_text = self.currentText()
+                current_data = self.itemData(self.currentIndex())
+                
+                # 刷新字体列表
+                self.parent_widget._populate_font_list()
+                
+                # 恢复之前选择的值
+                if current_data:
+                    # 根据 itemData 查找
+                    for i in range(self.count()):
+                        if self.itemData(i) == current_data:
+                            self.setCurrentIndex(i)
+                            break
+                elif current_text:
+                    # 根据文本查找
+                    index = self.findText(current_text)
+                    if index >= 0:
+                        self.setCurrentIndex(index)
+                
+                super().showPopup()
+        
+        self.font_family_combo = RefreshableComboBox(self)
         self.font_family_combo.setEditable(False)
         self._populate_font_list()
         style_layout.addRow("字体:", self.font_family_combo)
@@ -246,6 +275,9 @@ class PropertyPanel(QWidget):
         """Populate font combo box with available fonts from fonts folder"""
         import os
         from manga_translator.utils import BASE_PATH
+        
+        # 清空现有列表
+        self.font_family_combo.clear()
         
         fonts_dir = os.path.join(BASE_PATH, 'fonts')
         font_files = []
@@ -313,6 +345,11 @@ class PropertyPanel(QWidget):
         self.insert_placeholder_button.clicked.connect(self._insert_placeholder)
         self.insert_newline_button.clicked.connect(self._insert_newline)
         self.mark_horizontal_button.clicked.connect(self._mark_horizontal)
+        
+        # Action buttons
+        self.copy_button.clicked.connect(self.copy_region_requested.emit)
+        self.paste_button.clicked.connect(self.paste_region_requested.emit)
+        self.delete_button.clicked.connect(self.delete_region_requested.emit)
 
 
     def _on_mask_config_changed(self):

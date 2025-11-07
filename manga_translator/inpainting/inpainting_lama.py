@@ -114,7 +114,12 @@ class LamaInpainter(LamaMPEInpainter):
         
         # Padding
         img_pad = np.pad(image, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
-        mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
+        # 根据 mask_original_resized 的维度决定 padding 参数
+        if len(mask_original_resized.shape) == 3:
+            mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
+        else:
+            mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w)), mode='symmetric')
+            mask_pad = mask_pad[:, :, None]  # 扩展为3维
         
         # 准备输入（0-1归一化）
         img = img_pad.astype(np.float32) / 255.0

@@ -1204,7 +1204,7 @@ class EditorController(QObject):
         new_region_data = region_data.copy()
         
         # 复制样式属性
-        style_keys = ['font_family', 'font_size', 'font_color', 'alignment', 'direction', 'bold', 'italic']
+        style_keys = ['font_path', 'font_family', 'font_size', 'font_color', 'alignment', 'direction', 'bold', 'italic']
         for key in style_keys:
             if key in clipboard_data:
                 new_region_data[key] = clipboard_data[key]

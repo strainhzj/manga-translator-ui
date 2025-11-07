@@ -225,8 +225,23 @@ class RealCUGANUpscaler(OfflineUpscaler):
     
     def _process_single(self, img: Image.Image, device: torch.device) -> Image.Image:
         """Process a single image without tiling"""
+        # Convert grayscale to RGB if necessary
+        if img.mode in ('L', 'LA'):
+            img = img.convert('RGB')
+        elif img.mode == 'RGBA':
+            # Convert RGBA to RGB by compositing over white background
+            rgb = Image.new('RGB', img.size, (255, 255, 255))
+            rgb.paste(img, mask=img.split()[3])  # Use alpha channel as mask
+            img = rgb
+        
         # Convert to tensor
         np_img = np.array(img).astype(np.float32) / 255.0
+        
+        # Ensure 3D tensor (H, W, C)
+        if len(np_img.shape) == 2:
+            # Grayscale: expand to 3 channels
+            np_img = np.stack([np_img] * 3, axis=2)
+        
         tensor = torch.from_numpy(np_img).permute(2, 0, 1).unsqueeze(0).to(device)
         
         # Determine model parameters

@@ -101,9 +101,16 @@ class MainAppLogic(QObject):
             source_folder = self.file_to_folder_map.get(original_path)
 
             if source_folder:
-                # 文件来自文件夹，在输出目录创建同名文件夹
-                folder_name = os.path.basename(source_folder)
-                final_output_folder = os.path.join(output_folder, folder_name)
+                # 文件来自文件夹，保持相对路径结构
+                parent_dir = os.path.normpath(os.path.dirname(original_path))
+                relative_path = os.path.relpath(parent_dir, source_folder)
+                
+                # Normalize path and avoid adding '.' as a directory component
+                if relative_path == '.':
+                    final_output_folder = os.path.join(output_folder, os.path.basename(source_folder))
+                else:
+                    final_output_folder = os.path.join(output_folder, os.path.basename(source_folder), relative_path)
+                final_output_folder = os.path.normpath(final_output_folder)
             else:
                 # 文件是单独添加的，直接保存到输出目录
                 final_output_folder = output_folder
@@ -513,23 +520,42 @@ class MainAppLogic(QObject):
         """
         Expands folders in self.source_files into a list of image files.
         同时记录文件和文件夹的映射关系。
+        按文件夹分组排序：先对文件夹进行排序，然后对每个文件夹内的图片排序。
         """
         resolved_files = []
         self.file_to_folder_map.clear()  # 清空旧的映射
 
+        # 分离文件和文件夹
+        folders = []
+        individual_files = []
+        
         for path in self.source_files:
             if os.path.isdir(path):
-                # 获取文件夹中的所有图片
-                folder_files = self.file_service.get_image_files_from_folder(path, recursive=True)
-                resolved_files.extend(folder_files)
-                # 记录这些文件来自这个文件夹
-                for file_path in folder_files:
-                    self.file_to_folder_map[file_path] = path
+                folders.append(path)
             elif os.path.isfile(path):
                 if self.file_service.validate_image_file(path):
-                    resolved_files.append(path)
-                    # 单独添加的文件，不属于任何文件夹
-                    self.file_to_folder_map[path] = None
+                    individual_files.append(path)
+        
+        # 对文件夹进行排序
+        folders.sort()
+        
+        # 按文件夹分组处理
+        for folder in folders:
+            # 获取文件夹中的所有图片
+            folder_files = self.file_service.get_image_files_from_folder(folder, recursive=True)
+            # 对文件夹内的图片进行排序
+            folder_files.sort()
+            resolved_files.extend(folder_files)
+            # 记录这些文件来自这个文件夹
+            for file_path in folder_files:
+                self.file_to_folder_map[file_path] = folder
+        
+        # 处理单独添加的文件
+        individual_files.sort()
+        for file_path in individual_files:
+            resolved_files.append(file_path)
+            # 单独添加的文件，不属于任何文件夹
+            self.file_to_folder_map[file_path] = None
 
         return list(dict.fromkeys(resolved_files)) # Return unique files
 

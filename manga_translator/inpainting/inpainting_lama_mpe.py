@@ -308,7 +308,12 @@ class LamaMPEInpainter(OfflineInpainter):
         # Padding
         img_pad = np.pad(image, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
         mask_pad_single = np.pad(mask_resized, ((0, new_h - h), (0, new_w - w)), mode='constant', constant_values=0)
-        mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
+        # 根据 mask_original_resized 的维度决定 padding 参数
+        if len(mask_original_resized.shape) == 3:
+            mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
+        else:
+            mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w)), mode='symmetric')
+            mask_pad = mask_pad[:, :, None]  # 扩展为3维
         
         # ✅ 计算MPE输入（使用padding后的mask）
         rel_pos, direct = load_masked_position_encoding(mask_pad_single)
@@ -381,7 +386,12 @@ class LamaMPEInpainter(OfflineInpainter):
         # Padding
         img_pad = np.pad(image, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
         mask_pad_single = np.pad(mask_resized, ((0, new_h - h), (0, new_w - w)), mode='constant', constant_values=0)
-        mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
+        # 根据 mask_original_resized 的维度决定 padding 参数
+        if len(mask_original_resized.shape) == 3:
+            mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w), (0, 0)), mode='symmetric')
+        else:
+            mask_pad = np.pad(mask_original_resized, ((0, new_h - h), (0, new_w - w)), mode='symmetric')
+            mask_pad = mask_pad[:, :, None]  # 扩展为3维
         
         # ✅ 计算MPE输入（使用padding后的mask）
         rel_pos, direct = load_masked_position_encoding(mask_pad_single)

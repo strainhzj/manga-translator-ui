@@ -168,6 +168,28 @@ class EditorView(QWidget):
             selected_regions = self.model.get_selection()
             if selected_regions:
                 self.controller.delete_regions(selected_regions)
+    
+    def _handle_copy_from_panel(self):
+        """处理属性面板的复制按钮"""
+        selected_regions = self.model.get_selection()
+        if selected_regions:
+            self.controller.copy_region(selected_regions[0])
+    
+    def _handle_paste_from_panel(self):
+        """处理属性面板的粘贴按钮"""
+        selected_regions = self.model.get_selection()
+        if selected_regions and len(selected_regions) == 1:
+            # 有单个选中区域时，粘贴样式
+            self.controller.paste_region_style(selected_regions[0])
+        else:
+            # 无选中区域时，粘贴新区域
+            self.controller.paste_region()
+    
+    def _handle_delete_from_panel(self):
+        """处理属性面板的删除按钮"""
+        selected_regions = self.model.get_selection()
+        if selected_regions:
+            self.controller.delete_regions(selected_regions)
 
     def _create_left_panel(self) -> QWidget:
         """创建左侧的标签页，包含区域列表和属性面板"""
@@ -278,6 +300,9 @@ class EditorView(QWidget):
         self.property_panel.update_mask_requested.connect(self.controller.render_inpaint)
         self.property_panel.toggle_mask_visibility.connect(lambda state: self.controller.set_display_mask_type('refined', state))
         self.property_panel.toggle_removed_mask_visibility.connect(self.controller.set_removed_mask_visible)
+        self.property_panel.copy_region_requested.connect(self._handle_copy_from_panel)
+        self.property_panel.paste_region_requested.connect(self._handle_paste_from_panel)
+        self.property_panel.delete_region_requested.connect(self._handle_delete_from_panel)
         # --- Connect Mask Editing Tools ---
         self.property_panel.mask_tool_changed.connect(self.controller.set_active_tool)
         self.property_panel.brush_size_changed.connect(self.controller.set_brush_size)

@@ -219,7 +219,8 @@ class ResourceManager:
             KeyError: 区域不存在
         """
         if region_id not in self._regions:
-            raise KeyError(f"Region {region_id} not found")
+            self.logger.warning(f"Region {region_id} not found, skipping update")
+            return  # 静默失败，不抛出异常
         
         self._regions[region_id].data.update(updates)
         import time

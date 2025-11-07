@@ -117,6 +117,9 @@ test_colorize_only_mode.py
 # Ignore specific font file
 /fonts/字魂白鸽天行体(商用需授权).ttf
 
+# Ignore test directory
+test/
+
 # Ignore portable Git (users will download it)
 PortableGit/
 !PortableGit/.gitkeep
