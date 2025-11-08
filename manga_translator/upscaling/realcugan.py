@@ -225,6 +225,31 @@ class RealCUGANUpscaler(OfflineUpscaler):
     
     def _process_single(self, img: Image.Image, device: torch.device) -> Image.Image:
         """Process a single image without tiling"""
+        # Check minimum size requirement for RealCUGAN
+        # RealCUGAN uses padding=18/14/19 and then crops -20, requires minimum dimensions
+        min_size = 40  # Minimum size to allow padding and cropping
+        original_size = img.size
+        padded = False
+        
+        if img.size[0] < min_size or img.size[1] < min_size:
+            logger.warning(
+                f'Image size ({img.size[0]}x{img.size[1]}) is too small for RealCUGAN. '
+                f'Minimum size is {min_size}x{min_size}. '
+                f'Adding black padding to reach minimum size.'
+            )
+            # Calculate padding needed
+            pad_w = max(0, min_size - img.size[0])
+            pad_h = max(0, min_size - img.size[1])
+            
+            # Create new image with black background
+            new_size = (img.size[0] + pad_w, img.size[1] + pad_h)
+            padded_img = Image.new('RGB', new_size, (0, 0, 0))
+            
+            # Paste original image in top-left corner
+            padded_img.paste(img, (0, 0))
+            img = padded_img
+            padded = True
+        
         # Convert grayscale to RGB if necessary
         if img.mode in ('L', 'LA'):
             img = img.convert('RGB')
@@ -274,7 +299,17 @@ class RealCUGANUpscaler(OfflineUpscaler):
             output_np = output.squeeze(0).permute(1, 2, 0).cpu().numpy()
             output_np = np.clip(output_np, 0, 255).astype(np.uint8)
         
-        return Image.fromarray(output_np, mode='RGB')
+        result_img = Image.fromarray(output_np, mode='RGB')
+        
+        # If image was padded, crop back to original scaled size
+        if padded:
+            # Calculate the original region after upscaling
+            scaled_width = original_size[0] * self.scale
+            scaled_height = original_size[1] * self.scale
+            result_img = result_img.crop((0, 0, scaled_width, scaled_height))
+            logger.info(f'Cropped upscaled image from {output_np.shape[1]}x{output_np.shape[0]} to {scaled_width}x{scaled_height}')
+        
+        return result_img
     
     def _process_with_tiles(self, img: Image.Image, device: torch.device, tile_size: int) -> Image.Image:
         """Process image with external tiling"""
