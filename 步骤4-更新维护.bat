@@ -40,34 +40,56 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-if not exist "%CONDA_ENV_PATH%\python.exe" (
-    echo [ERROR] Conda环境不存在
+REM 检查环境是否存在（优先检查命名环境）
+set ENV_FOUND=0
+
+REM 方法1: 检查命名环境
+call conda info --envs 2>nul | findstr /C:"%CONDA_ENV_NAME%" >nul 2>&1
+if %ERRORLEVEL% == 0 (
+    set ENV_FOUND=1
+    set USE_NAMED_ENV=1
+    echo [INFO] 检测到命名环境: %CONDA_ENV_NAME%
+)
+
+REM 方法2: 检查旧版本路径环境
+if %ENV_FOUND% == 0 (
+    if exist "%CONDA_ENV_PATH%\python.exe" (
+        set ENV_FOUND=1
+        set USE_NAMED_ENV=0
+        echo [INFO] 检测到路径环境（旧版本）: %CONDA_ENV_PATH%
+    )
+)
+
+REM 如果两种环境都不存在
+if %ENV_FOUND% == 0 (
+    echo [ERROR] 未检测到Conda环境
     echo 请先运行 步骤1-首次安装.bat 创建环境
     pause
     exit /b 1
 )
 
 REM 激活conda环境
-REM 使用MINICONDA_ROOT变量，支持中文路径
-if exist "%MINICONDA_ROOT%\Scripts\activate.bat" (
-    echo 正在激活环境...
-    call "%MINICONDA_ROOT%\Scripts\activate.bat" "%CONDA_ENV_PATH%" 2>nul
-    if %ERRORLEVEL% neq 0 (
-        REM 尝试使用conda activate作为备用
-        call conda activate "%CONDA_ENV_PATH%" 2>nul
+echo 正在激活环境...
+if %USE_NAMED_ENV% == 1 (
+    REM 激活命名环境
+    call conda activate "%CONDA_ENV_NAME%" 2>nul
+    if %ERRORLEVEL% == 0 (
+        echo [OK] 已激活命名环境: %CONDA_ENV_NAME%
+    ) else (
+        echo [ERROR] 无法激活环境: %CONDA_ENV_NAME%
+        pause
+        exit /b 1
     )
 ) else (
-    REM 如果没有本地Miniconda，使用系统conda
+    REM 激活路径环境（旧版本）
     call conda activate "%CONDA_ENV_PATH%" 2>nul
-)
-
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] 无法激活环境
-    echo 环境路径: %CONDA_ENV_PATH%
-    echo Miniconda路径: %MINICONDA_ROOT%
-    echo 请检查Conda是否正确安装或重新运行 步骤1-首次安装.bat
-    pause
-    exit /b 1
+    if %ERRORLEVEL% == 0 (
+        echo [OK] 已激活路径环境（旧版本）
+    ) else (
+        echo [ERROR] 无法激活环境: %CONDA_ENV_PATH%
+        pause
+        exit /b 1
+    )
 )
 
 REM 检查是否有便携版 Git
