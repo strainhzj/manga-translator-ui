@@ -519,9 +519,17 @@ class ExportService:
 
             # 执行翻译（实际是渲染）
             import sys
-            # 在Windows上的工作线程中，需要使用SelectorEventLoop而不是ProactorEventLoop
+            # 在Windows上的工作线程中，需要手动初始化socket
             if sys.platform == 'win32':
-                asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+                # 手动初始化Windows Socket
+                import socket
+                try:
+                    temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    temp_sock.close()
+                except:
+                    pass
+                
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
             
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
