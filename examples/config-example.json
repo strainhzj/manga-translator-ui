@@ -96,12 +96,12 @@
     "overwrite": true,
     "skip_no_text": false,
     "save_text": true,
-    "load_text": false,
+    "load_text": true,
     "template": false,
     "save_quality": 100,
     "batch_size": 3,
     "batch_concurrent": false,
-    "generate_and_export": true,
+    "generate_and_export": false,
     "colorize_only": false,
     "upscale_only": false
   }
