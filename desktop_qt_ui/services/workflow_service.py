@@ -863,7 +863,6 @@ def safe_update_large_json_from_text(
     except (json.JSONDecodeError, ValueError) as e:
         logger.info(f"[DEBUG] 直接JSON解析失败: {e}，尝试使用模板解析")
         # 如果JSON解析失败，使用原来的模板解析逻辑
-        try:
         # 移除前缀和后缀
         logger.info(f"[DEBUG] 原始文本内容长度: {len(text_content)}")
         logger.info(f"[DEBUG] Prefix: {repr(prefix[:50] if prefix else '')}")
@@ -940,9 +939,6 @@ def safe_update_large_json_from_text(
                     continue  # 跳过解析失败的条目
             else:
                 logger.info(f"[DEBUG] Item {idx} 正则匹配失败: {repr(item[:100])}")
-
-        except Exception as e:
-            return f"错误：解析TXT文件失败: {e}"
 
     if not translations:
         logger.warning(f"Could not parse any translations from '{os.path.basename(text_file_path)}'.")
