@@ -292,7 +292,7 @@ def generate_original_text(
         if original_text.strip():
             items.append({
                 'original': original_text,
-                'translated': translated_text  # 直接使用translation字段，即使为空
+                'translated': translated_text if translated_text else original_text  # 如果translation为空，使用原文作为占位符
             })
 
     # 生成输出路径
@@ -845,20 +845,29 @@ def safe_update_large_json_from_text(
 
     # 2. 解析翻译内容
     logger.debug("Parsing translations from text content.")
+    logger.info(f"[DEBUG] TXT文件路径: {text_file_path}")
+    logger.info(f"[DEBUG] JSON文件路径: {json_file_path}")
+    logger.info(f"[DEBUG] 模板文件路径: {template_path}")
     translations = {}
     try:
         # 移除前缀和后缀
+        logger.info(f"[DEBUG] 原始文本内容长度: {len(text_content)}")
+        logger.info(f"[DEBUG] Prefix: {repr(prefix[:50] if prefix else '')}")
+        logger.info(f"[DEBUG] Suffix: {repr(suffix[:50] if suffix else '')}")
         if prefix and text_content.startswith(prefix):
             text_content = text_content[len(prefix):]
         if suffix and text_content.endswith(suffix):
             text_content = text_content[:-len(suffix)]
 
         # 分割条目
+        logger.info(f"[DEBUG] Separator: {repr(separator[:50] if separator else '')}")
         if separator:
             items = text_content.split(separator)
         else:
             items = [text_content] if text_content.strip() else []
-        logger.debug(f"Found {len(items)} items in text file.")
+        logger.info(f"[DEBUG] Found {len(items)} items in text file.")
+        if len(items) > 0:
+            logger.info(f"[DEBUG] First item: {repr(items[0][:100] if items[0] else '')}")
 
         # 解析每个条目
         parts = re.split(f'({re.escape("<original>")}|{re.escape("<translated>")})', item_template)
@@ -874,11 +883,15 @@ def safe_update_large_json_from_text(
             else:
                 parser_regex_str += re.escape(part)
 
+        logger.info(f"[DEBUG] Item template: {repr(item_template)}")
+        logger.info(f"[DEBUG] Parser regex: {repr(parser_regex_str)}")
         parser_regex = re.compile(parser_regex_str, re.DOTALL)
 
-        for item in items:
+        matched_count = 0
+        for idx, item in enumerate(items):
             item_stripped = item.strip()
             if not item_stripped:
+                logger.info(f"[DEBUG] Item {idx}: 跳过空条目")
                 continue
 
             match = parser_regex.search(item)
@@ -890,18 +903,25 @@ def safe_update_large_json_from_text(
                         # 直接使用捕获的字符串
                         result[group_name] = captured_string
                     translations[result['original']] = result['translated']
+                    matched_count += 1
+                    if matched_count <= 3:  # 只打印前3个
+                        logger.info(f"[DEBUG] Item {idx} 匹配成功: original={repr(result['original'][:30])}, translated={repr(result['translated'][:30])}")
                 except (IndexError, KeyError) as e:
-                    logger.debug(f"Failed to parse item: {item[:100]}... Error: {e}")
+                    logger.info(f"[DEBUG] Item {idx} 解析失败: {item[:100]}... Error: {e}")
                     continue  # 跳过解析失败的条目
+            else:
+                logger.info(f"[DEBUG] Item {idx} 正则匹配失败: {repr(item[:100])}")
 
     except Exception as e:
         return f"错误：解析TXT文件失败: {e}"
 
     if not translations:
         logger.warning(f"Could not parse any translations from '{os.path.basename(text_file_path)}'.")
+        logger.info(f"[DEBUG] 解析失败总结: 找到 {len(items)} 个条目，但没有成功解析任何翻译")
         return "错误：未能从TXT文件中解析出任何翻译内容"
 
     logger.info(f"解析出 {len(translations)} 条翻译")
+    logger.info(f"[DEBUG] 前3条翻译: {list(translations.items())[:3]}")
 
     # 2.5. 创建标准化映射（用于模糊匹配）
     def normalize_text(text):
