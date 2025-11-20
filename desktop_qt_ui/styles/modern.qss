@@ -9,7 +9,7 @@ QWidget {
     background-color: #F5F7FA;
     color: #2C3E50;
     font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
-    font-size: 13px;
+    font-size: 11px;
 }
 
 QMainWindow {
@@ -21,8 +21,8 @@ QPushButton {
     background-color: #2196F3;
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 6px 12px;
+    border-radius: 4px;
+    padding: 4px 8px;
     font-weight: 500;
 }
 
@@ -62,14 +62,14 @@ QPushButton[class="danger"]:hover {
 QLineEdit {
     background-color: white;
     border: 1px solid #CFD8DC;
-    border-radius: 6px;
-    padding: 8px 12px;
+    border-radius: 4px;
+    padding: 4px 8px;
     selection-background-color: #2196F3;
 }
 
 QLineEdit:focus {
     border: 2px solid #2196F3;
-    padding: 7px 11px;
+    padding: 3px 7px;
 }
 
 QLineEdit:disabled {
@@ -81,14 +81,14 @@ QLineEdit:disabled {
 QTextEdit {
     background-color: white;
     border: 1px solid #CFD8DC;
-    border-radius: 6px;
-    padding: 8px;
+    border-radius: 4px;
+    padding: 4px;
     selection-background-color: #2196F3;
 }
 
 QTextEdit:focus {
     border: 2px solid #2196F3;
-    padding: 7px;
+    padding: 3px;
 }
 
 /* ===== 下拉框样式 ===== */
@@ -133,7 +133,7 @@ QComboBox QAbstractItemView {
 }
 
 QComboBox QAbstractItemView::item {
-    padding: 6px 12px;
+    padding: 4px 8px;
     border-radius: 4px;
 }
 
@@ -147,10 +147,10 @@ QCheckBox {
 }
 
 QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     border: 2px solid #90A4AE;
-    border-radius: 4px;
+    border-radius: 3px;
     background-color: white;
 }
 
@@ -221,10 +221,10 @@ QTabBar::tab {
     background-color: #ECEFF1;
     color: #546E7A;
     border: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    padding: 10px 20px;
-    margin-right: 4px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding: 6px 12px;
+    margin-right: 2px;
     font-weight: 500;
 }
 
@@ -242,9 +242,9 @@ QTabBar::tab:hover:!selected {
 QGroupBox {
     background-color: white;
     border: 1px solid #E0E0E0;
-    border-radius: 8px;
-    margin-top: 12px;
-    padding: 16px;
+    border-radius: 6px;
+    margin-top: 8px;
+    padding: 8px;
     font-weight: 600;
 }
 
@@ -266,8 +266,8 @@ QListView, QTreeView {
 }
 
 QListView::item, QTreeView::item {
-    padding: 8px;
-    border-radius: 4px;
+    padding: 4px;
+    border-radius: 3px;
 }
 
 QListView::item:hover, QTreeView::item:hover {
@@ -288,8 +288,8 @@ QMenuBar {
 
 QMenuBar::item {
     background-color: transparent;
-    padding: 6px 12px;
-    border-radius: 4px;
+    padding: 4px 8px;
+    border-radius: 3px;
 }
 
 QMenuBar::item:selected {
@@ -310,8 +310,8 @@ QMenu {
 }
 
 QMenu::item {
-    padding: 8px 24px 8px 12px;
-    border-radius: 4px;
+    padding: 4px 16px 4px 8px;
+    border-radius: 3px;
 }
 
 QMenu::item:selected {
@@ -339,9 +339,9 @@ QToolTip {
 QProgressBar {
     background-color: #E0E0E0;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     text-align: center;
-    height: 12px;
+    height: 8px;
 }
 
 QProgressBar::chunk {
@@ -392,17 +392,17 @@ QFormLayout QLabel {
 .card {
     background-color: white;
     border: 1px solid #E0E0E0;
-    border-radius: 12px;
-    padding: 16px;
+    border-radius: 8px;
+    padding: 8px;
 }
 
 /* 主要操作按钮 */
 .primary-button {
     background-color: #2196F3;
     color: white;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 12px 24px;
+    padding: 6px 12px;
 }
 
 .primary-button:hover {
@@ -498,9 +498,9 @@ QListWidget#regionList {
 QListWidget#regionList::item {
     background-color: white;
     border: 1px solid #E0E0E0;
-    border-radius: 6px;
-    padding: 8px;
-    margin: 4px;
+    border-radius: 4px;
+    padding: 4px;
+    margin: 2px;
 }
 
 QListWidget#regionList::item:hover {
@@ -517,8 +517,8 @@ QListWidget#regionList::item:selected {
 /* 属性面板 */
 #propertyPanel {
     background-color: white;
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 6px;
+    padding: 6px;
 }
 
 /* 文本编辑区域（属性面板中的译文编辑） */
