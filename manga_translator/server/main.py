@@ -883,12 +883,17 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
 def prepare(args):
     global nonce
     
-    if args.nonce is None:
+    # web 模式没有 nonce 参数，使用 getattr 避免 AttributeError
+    args_nonce = getattr(args, 'nonce', None)
+    if args_nonce is None:
         nonce = os.getenv('MT_WEB_NONCE', generate_nonce())
     else:
-        nonce = args.nonce
-    if args.start_instance:
+        nonce = args_nonce
+    
+    # start_instance 也可能不存在于某些模式
+    if getattr(args, 'start_instance', False):
         return start_translator_client_proc(args.host, args.port + 1, nonce, args)
+    
     folder_name= "upload-cache"
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
@@ -1011,7 +1016,8 @@ def main(args):
     server_config['retry_attempts'] = getattr(args, 'retry_attempts', None)
     print(f"[SERVER CONFIG] use_gpu={server_config['use_gpu']}, use_gpu_limited={server_config['use_gpu_limited']}, verbose={server_config['verbose']}, models_ttl={server_config['models_ttl']}, retry_attempts={server_config['retry_attempts']}")
     
-    args.start_instance = True
+    # web 模式不启动独立的翻译实例（与旧版本保持一致）
+    args.start_instance = False
     proc = prepare(args)
     print("Nonce: "+nonce)
     try:
