@@ -341,6 +341,43 @@ python -m manga_translator web --retry-attempts 3
 - `POST /translate/batch/json` - 批量翻译，返回 JSON 数组
 - `POST /translate/batch/images` - 批量翻译，返回 ZIP 压缩包
 
+> ⚠️ **重要**：批量端点使用 JSON 格式请求，图片需要 base64 编码，不是 multipart/form-data 格式！
+
+**批量翻译示例**：
+```python
+import requests
+import base64
+import json
+
+# 读取图片并编码为 base64
+with open('image1.jpg', 'rb') as f:
+    img1_b64 = base64.b64encode(f.read()).decode('utf-8')
+with open('image2.jpg', 'rb') as f:
+    img2_b64 = base64.b64encode(f.read()).decode('utf-8')
+
+# 准备请求数据
+data = {
+    "images": [
+        f"data:image/jpeg;base64,{img1_b64}",
+        f"data:image/jpeg;base64,{img2_b64}"
+    ],
+    "config": {},  # 使用默认配置
+    "batch_size": 2
+}
+
+# 发送请求（注意是 json=data，不是 files=）
+response = requests.post(
+    'http://127.0.0.1:8200/translate/batch/json',
+    json=data,
+    timeout=600
+)
+
+# 处理结果
+if response.status_code == 200:
+    results = response.json()
+    print(f"成功翻译 {len(results)} 张图片")
+```
+
 **导出端点**（导出翻译结果）：
 - `POST /translate/export/original` - 导出原文（ZIP：JSON + TXT）
 - `POST /translate/export/original/stream` - 导出原文（流式，支持进度）
@@ -367,6 +404,9 @@ python -m manga_translator web --retry-attempts 3
 - `GET /result/{folder_name}/final.png` - 获取指定结果图片
 - `DELETE /results/{folder_name}` - 删除指定结果目录
 - `DELETE /results/clear` - 清空所有结果目录
+
+**维护端点**：
+- `POST /cleanup/temp` - 清理临时文件（默认清理24小时前的文件）
 
 ---
 
@@ -660,6 +700,51 @@ with open('manga.jpg', 'rb') as img, \
 2. 通过原文（`text` 字段）匹配对应的文本框
 3. 支持模糊匹配（标准化后匹配）
 4. 更新 `translation` 字段
+
+### 临时文件清理
+
+流式端点（`/stream`）会在 `result` 目录中生成临时文件。为了避免磁盘空间占用，建议定期清理。
+
+**清理端点**：
+```python
+POST /cleanup/temp?max_age_hours=24
+```
+
+**参数**：
+- `max_age_hours` - 清理多少小时前的临时文件（默认：24小时）
+
+**返回示例**：
+```json
+{
+  "deleted": 15,
+  "message": "Successfully cleaned up 15 temporary files older than 24 hours"
+}
+```
+
+**使用示例**：
+```python
+import requests
+
+# 清理24小时前的临时文件（默认）
+response = requests.post('http://localhost:8000/cleanup/temp')
+result = response.json()
+print(f"已清理 {result['deleted']} 个临时文件")
+
+# 清理1小时前的临时文件
+response = requests.post('http://localhost:8000/cleanup/temp?max_age_hours=1')
+result = response.json()
+print(f"已清理 {result['deleted']} 个临时文件")
+```
+
+**建议**：
+- 在生产环境中，建议使用定时任务（如 cron）定期调用清理端点
+- 开发环境可以设置较短的清理时间（如 1 小时）
+- 生产环境建议设置较长的清理时间（如 24-48 小时）
+
+**注意**：
+- 只会清理 `result` 目录中以 `temp_` 开头的文件和文件夹
+- 正在使用的文件会被跳过（Windows 文件锁定）
+- 清理操作是安全的，不会影响正在进行的翻译任务
 - `DELETE /results/clear` - 清空所有结果目录
 
 **支持的工作流程**：

@@ -245,24 +245,32 @@ async def batch_images(req: Request, data: BatchTranslateRequest):
     
     # Create temporary ZIP file
     with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-        with zipfile.ZipFile(tmp_file, 'w') as zip_file:
-            for i, ctx in enumerate(results):
-                if ctx.result:
-                    img_byte_arr = io.BytesIO()
-                    ctx.result.save(img_byte_arr, format="PNG")
-                    zip_file.writestr(f"translated_{i+1}.png", img_byte_arr.getvalue())
-        
-        # Return ZIP file
-        with open(tmp_file.name, 'rb') as f:
-            zip_data = f.read()
-        
-        # Clean up temporary file
-        os.unlink(tmp_file.name)
-        
-        return StreamingResponse(
-            io.BytesIO(zip_data),
-            media_type="application/zip",
-            headers={"Content-Disposition": "attachment; filename=translated_images.zip"}
+        tmp_file_name = tmp_file.name
+    
+    # 文件句柄已关闭，现在可以安全地写入
+    with zipfile.ZipFile(tmp_file_name, 'w') as zip_file:
+        for i, ctx in enumerate(results):
+            if ctx.result:
+                img_byte_arr = io.BytesIO()
+                ctx.result.save(img_byte_arr, format="PNG")
+                zip_file.writestr(f"translated_{i+1}.png", img_byte_arr.getvalue())
+    
+    # 读取 ZIP 文件内容
+    with open(tmp_file_name, 'rb') as f:
+        zip_data = f.read()
+    
+    # 清理临时文件（Windows 兼容）
+    try:
+        os.unlink(tmp_file_name)
+    except PermissionError:
+        # Windows 上可能需要延迟删除
+        import atexit
+        atexit.register(lambda: os.unlink(tmp_file_name) if os.path.exists(tmp_file_name) else None)
+    
+    return StreamingResponse(
+        io.BytesIO(zip_data),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=translated_images.zip"}
         )
 
 @app.post("/translate/export/original", response_class=StreamingResponse, tags=["api", "export"])
@@ -481,15 +489,18 @@ async def import_json_and_render(req: Request, image: UploadFile = File(...), js
     json_content = await json_file.read()
     conf = parse_config(config)
     
+    # 使用临时文件名
+    temp_name = f"temp_{secrets.token_hex(8)}"
+    # 先创建临时图片路径（在当前目录或result目录）
+    temp_image_path = os.path.join("result", f"{temp_name}.png")
+    os.makedirs("result", exist_ok=True)
+    
     # 保存 JSON 到临时文件
-    work_dir = get_work_dir()
+    work_dir = get_work_dir(temp_image_path)
     json_dir = os.path.join(work_dir, 'json')
     os.makedirs(json_dir, exist_ok=True)
     
-    # 使用临时文件名
-    temp_name = f"temp_{secrets.token_hex(8)}"
     json_path = os.path.join(json_dir, f"{temp_name}_translations.json")
-    temp_image_path = os.path.join(work_dir, f"{temp_name}.png")
     
     try:
         # 写入 JSON 文件
@@ -539,23 +550,37 @@ async def import_json_and_render(req: Request, image: UploadFile = File(...), js
 async def import_txt_and_render(req: Request, image: UploadFile = File(...), txt_file: UploadFile = File(...), json_file: UploadFile = File(...), config: str = Form("{}"), template: UploadFile = File(None)):
     """导入 TXT + JSON + 图片，返回渲染后的图片（使用 UI 层的导入逻辑）"""
     import tempfile
+    import importlib.util
     from manga_translator.utils.path_manager import get_work_dir
     from PIL import Image as PILImage
-    from desktop_qt_ui.services.workflow_service import safe_update_large_json_from_text, ensure_default_template_exists
+    
+    # 直接导入 workflow_service 模块，避免触发 __init__.py
+    workflow_service_path = os.path.join(os.path.dirname(__file__), '..', '..', 'desktop_qt_ui', 'services', 'workflow_service.py')
+    workflow_service_path = os.path.abspath(workflow_service_path)
+    spec = importlib.util.spec_from_file_location("workflow_service", workflow_service_path)
+    workflow_service = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(workflow_service)
+    
+    safe_update_large_json_from_text = workflow_service.safe_update_large_json_from_text
+    ensure_default_template_exists = workflow_service.ensure_default_template_exists
     
     img_bytes = await image.read()
     txt_content = await txt_file.read()
     json_content = await json_file.read()
     conf = parse_config(config)
     
+    # 使用临时文件名
+    temp_name = f"temp_{secrets.token_hex(8)}"
+    # 先创建临时图片路径（在result目录）
+    temp_image_path = os.path.join("result", f"{temp_name}.png")
+    os.makedirs("result", exist_ok=True)
+    
     # 创建工作目录
-    work_dir = get_work_dir()
+    work_dir = get_work_dir(temp_image_path)
     json_dir = os.path.join(work_dir, 'json')
     os.makedirs(json_dir, exist_ok=True)
     
-    temp_name = f"temp_{secrets.token_hex(8)}"
     json_path = os.path.join(json_dir, f"{temp_name}_translations.json")
-    temp_image_path = os.path.join(work_dir, f"{temp_name}.png")
     temp_txt_path = os.path.join(work_dir, f"{temp_name}_temp.txt")
     
     try:
@@ -637,14 +662,18 @@ async def import_json_and_render_stream(req: Request, image: UploadFile = File(.
     json_content = await json_file.read()
     conf = parse_config(config)
     
+    # 使用临时文件名
+    temp_name = f"temp_{secrets.token_hex(8)}"
+    # 先创建临时图片路径（在result目录）
+    temp_image_path = os.path.join("result", f"{temp_name}.png")
+    os.makedirs("result", exist_ok=True)
+    
     # 保存 JSON 到临时文件
-    work_dir = get_work_dir()
+    work_dir = get_work_dir(temp_image_path)
     json_dir = os.path.join(work_dir, 'json')
     os.makedirs(json_dir, exist_ok=True)
     
-    temp_name = f"temp_{secrets.token_hex(8)}"
     json_path = os.path.join(json_dir, f"{temp_name}_translations.json")
-    temp_image_path = os.path.join(work_dir, f"{temp_name}.png")
     
     try:
         # 写入 JSON 文件
@@ -660,36 +689,56 @@ async def import_json_and_render_stream(req: Request, image: UploadFile = File(.
         temp_image.name = temp_image_path
         
         # 使用流式翻译，传递 PIL Image 对象
+        # 注意：流式响应中不能在 finally 中删除文件，因为响应还在进行中
+        # 临时文件会在 result 目录中累积，需要定期清理
         return await while_streaming(req, transform_to_image, conf, temp_image, "load_text")
     
-    finally:
-        # 清理临时文件（在流式响应完成后）
-        if os.path.exists(json_path):
-            os.unlink(json_path)
-        if os.path.exists(temp_image_path):
-            os.unlink(temp_image_path)
+    except Exception as e:
+        # 只在出错时清理临时文件
+        try:
+            if os.path.exists(json_path):
+                os.unlink(json_path)
+            if os.path.exists(temp_image_path):
+                os.unlink(temp_image_path)
+        except:
+            pass  # 忽略清理错误
+        raise
 
 @app.post("/translate/import/txt/stream", response_class=StreamingResponse, tags=["api", "import", "stream"])
 async def import_txt_and_render_stream(req: Request, image: UploadFile = File(...), txt_file: UploadFile = File(...), json_file: UploadFile = File(...), config: str = Form("{}"), template: UploadFile = File(None)):
     """导入 TXT + JSON + 图片，返回渲染后的图片（流式，支持进度，使用 UI 层的导入逻辑）"""
     import tempfile
+    import importlib.util
     from manga_translator.utils.path_manager import get_work_dir
     from PIL import Image
-    from desktop_qt_ui.services.workflow_service import safe_update_large_json_from_text, ensure_default_template_exists
+    
+    # 直接导入 workflow_service 模块，避免触发 __init__.py
+    workflow_service_path = os.path.join(os.path.dirname(__file__), '..', '..', 'desktop_qt_ui', 'services', 'workflow_service.py')
+    workflow_service_path = os.path.abspath(workflow_service_path)
+    spec = importlib.util.spec_from_file_location("workflow_service", workflow_service_path)
+    workflow_service = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(workflow_service)
+    
+    safe_update_large_json_from_text = workflow_service.safe_update_large_json_from_text
+    ensure_default_template_exists = workflow_service.ensure_default_template_exists
     
     img = await image.read()
     txt_content = await txt_file.read()
     json_content = await json_file.read()
     conf = parse_config(config)
     
+    # 使用临时文件名
+    temp_name = f"temp_{secrets.token_hex(8)}"
+    # 先创建临时图片路径（在result目录）
+    temp_image_path = os.path.join("result", f"{temp_name}.png")
+    os.makedirs("result", exist_ok=True)
+    
     # 创建工作目录
-    work_dir = get_work_dir()
+    work_dir = get_work_dir(temp_image_path)
     json_dir = os.path.join(work_dir, 'json')
     os.makedirs(json_dir, exist_ok=True)
     
-    temp_name = f"temp_{secrets.token_hex(8)}"
     json_path = os.path.join(json_dir, f"{temp_name}_translations.json")
-    temp_image_path = os.path.join(work_dir, f"{temp_name}.png")
     temp_txt_path = os.path.join(work_dir, f"{temp_name}_temp.txt")
     
     try:
@@ -730,14 +779,20 @@ async def import_txt_and_render_stream(req: Request, image: UploadFile = File(..
         temp_image.name = temp_image_path
         
         # 使用流式翻译，传递 PIL Image 对象
+        # 注意：流式响应中不能在 finally 中删除文件，因为响应还在进行中
+        # 临时文件会在 result 目录中累积，需要定期清理
         return await while_streaming(req, transform_to_image, conf, temp_image, "load_text")
     
-    finally:
-        # 清理临时文件
-        if os.path.exists(json_path):
-            os.unlink(json_path)
-        if os.path.exists(temp_image_path):
-            os.unlink(temp_image_path)
+    except Exception as e:
+        # 只在出错时清理临时文件
+        try:
+            if os.path.exists(json_path):
+                os.unlink(json_path)
+            if os.path.exists(temp_image_path):
+                os.unlink(temp_image_path)
+        except:
+            pass  # 忽略清理错误
+        raise
 
 @app.post("/translate/export/original/stream", response_class=StreamingResponse, tags=["api", "export", "stream"])
 async def export_original_stream(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
@@ -999,6 +1054,52 @@ async def delete_result(folder_name: str):
 #todo: restart if crash
 #todo: cache results
 #todo: cleanup cache
+
+@app.post("/cleanup/temp", tags=["api", "maintenance"])
+async def cleanup_temp_files(max_age_hours: int = 24):
+    """
+    清理临时文件
+    
+    Args:
+        max_age_hours: 清理多少小时前的临时文件（默认24小时）
+    
+    Returns:
+        清理结果统计
+    """
+    import time
+    
+    result_dir = "result"
+    if not os.path.exists(result_dir):
+        return {"deleted": 0, "message": "No temp directory found"}
+    
+    deleted_count = 0
+    current_time = time.time()
+    max_age_seconds = max_age_hours * 3600
+    
+    try:
+        for filename in os.listdir(result_dir):
+            if filename.startswith("temp_"):
+                filepath = os.path.join(result_dir, filename)
+                try:
+                    # 检查文件年龄
+                    file_age = current_time - os.path.getmtime(filepath)
+                    if file_age > max_age_seconds:
+                        if os.path.isfile(filepath):
+                            os.unlink(filepath)
+                            deleted_count += 1
+                        elif os.path.isdir(filepath):
+                            shutil.rmtree(filepath)
+                            deleted_count += 1
+                except Exception as e:
+                    # 忽略单个文件的删除错误（可能被占用）
+                    continue
+        
+        return {
+            "deleted": deleted_count,
+            "message": f"Successfully cleaned up {deleted_count} temporary files older than {max_age_hours} hours"
+        }
+    except Exception as e:
+        raise HTTPException(500, detail=f"Error during cleanup: {str(e)}")
 
 def init_translator(use_gpu=False, verbose=False):
     """初始化翻译器（预留函数）"""

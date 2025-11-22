@@ -308,19 +308,24 @@ async def while_streaming(req: Request, transform, config: Config, image: bytes 
                 print("[STREAMING] 完成！")
                 yield pack_message(1, json.dumps({"stage": "complete", "message": "完成！"}, ensure_ascii=False).encode('utf-8'))
             except Exception as transform_error:
-                error_msg = f"转换结果失败: {str(transform_error)}"
+                error_msg = f"转换结果失败: {type(transform_error).__name__}: {str(transform_error)}"
                 print(f"[STREAMING ERROR] {error_msg}")
                 import traceback
                 traceback.print_exc()
                 yield pack_message(2, json.dumps({"error": error_msg, "stage": "transform"}, ensure_ascii=False).encode('utf-8'))
+                return  # 确保不继续执行
             
         except Exception as e:
             # 发送错误
-            error_msg = f"翻译失败: {str(e)}"
+            error_msg = f"翻译失败: {type(e).__name__}: {str(e)}"
             print(f"[STREAMING ERROR] {error_msg}")
             import traceback
             traceback.print_exc()
-            yield pack_message(2, json.dumps({"error": error_msg, "stage": "unknown"}, ensure_ascii=False).encode('utf-8'))
+            try:
+                yield pack_message(2, json.dumps({"error": error_msg, "stage": "unknown"}, ensure_ascii=False).encode('utf-8'))
+            except:
+                # 如果连错误消息都发送失败，至少不要打印二进制数据
+                pass
     
     return StreamingResponse(generate(), media_type="application/octet-stream")
 

@@ -84,7 +84,15 @@ def to_translation(ctx: Context) -> TranslationResponse:
         results.append(Translation(**region_dict))
 
     # 获取图片尺寸
-    original_width, original_height = ctx.input.size
+    if ctx.input is not None:
+        original_width, original_height = ctx.input.size
+    elif ctx.result is not None:
+        original_width, original_height = ctx.result.size
+    elif hasattr(ctx, 'img_rgb') and ctx.img_rgb is not None:
+        original_height, original_width = ctx.img_rgb.shape[:2]
+    else:
+        # 默认值
+        original_width, original_height = 0, 0
     
     # 构建响应数据
     response_data = {
