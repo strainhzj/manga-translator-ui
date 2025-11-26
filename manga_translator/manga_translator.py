@@ -891,8 +891,9 @@ class MangaTranslator:
                 logger.error(f"Error saving inpainted.png debug image: {e}")
                 logger.debug(f"Exception details: {traceback.format_exc()}")
 
-        # 保存inpainted图片到新目录结构（仅在save_text模式下，用于可编辑图片功能）
-        if self.save_text and hasattr(ctx, 'image_name') and ctx.image_name and ctx.img_inpainted is not None:
+        # 保存inpainted图片到新目录结构（用于可编辑图片功能）
+        # 与JSON保存逻辑保持一致：save_text或text_output_file任一满足即保存
+        if (self.save_text or self.text_output_file) and hasattr(ctx, 'image_name') and ctx.image_name and ctx.img_inpainted is not None:
             self._save_inpainted_image(ctx.image_name, ctx.img_inpainted)
         # -- Rendering
         await self._report_progress('rendering')
@@ -2381,7 +2382,8 @@ class MangaTranslator:
                         except Exception as save_err:
                             logger.error(f"Error saving standard batch result for {os.path.basename(ctx.image_name)}: {save_err}")
 
-                    if ctx.text_regions and hasattr(ctx, 'image_name') and ctx.image_name:
+                    # 只在save_text或text_output_file启用时保存JSON
+                    if (self.save_text or self.text_output_file) and ctx.text_regions and hasattr(ctx, 'image_name') and ctx.image_name:
                         # 使用循环变量中的config，而不是从ctx中获取
                         self._save_text_to_file(ctx.image_name, ctx, config)
 
@@ -3365,8 +3367,9 @@ class MangaTranslator:
                 logger.error(f"Error saving inpainted.png debug image: {e}")
                 logger.debug(f"Exception details: {traceback.format_exc()}")
 
-        # 保存inpainted图片到新目录结构（仅在save_text模式下，用于可编辑图片功能）
-        if self.save_text and hasattr(ctx, 'image_name') and ctx.image_name and ctx.img_inpainted is not None:
+        # 保存inpainted图片到新目录结构（用于可编辑图片功能）
+        # 与JSON保存逻辑保持一致：save_text或text_output_file任一满足即保存
+        if (self.save_text or self.text_output_file) and hasattr(ctx, 'image_name') and ctx.image_name and ctx.img_inpainted is not None:
             self._save_inpainted_image(ctx.image_name, ctx.img_inpainted)
 
         # -- Rendering
@@ -3838,7 +3841,8 @@ class MangaTranslator:
                             logger.error(traceback.format_exc())
                     # --- END SAVE LOGIC ---
 
-                    if ctx.text_regions and hasattr(ctx, 'image_name') and ctx.image_name:
+                    # 只在save_text或text_output_file启用时保存JSON
+                    if (self.save_text or self.text_output_file) and ctx.text_regions and hasattr(ctx, 'image_name') and ctx.image_name:
                         # 使用循环变量中的config，而不是从ctx中获取
                         self._save_text_to_file(ctx.image_name, ctx, config)
 
