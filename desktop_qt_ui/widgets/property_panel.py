@@ -255,8 +255,7 @@ class PropertyPanel(QWidget):
         self.translated_text_box.setMaximumHeight(150)
         
         text_layout.addWidget(QLabel("原文:"))
-        self.original_edit_status_label = QLabel("点击编辑原文")
-        text_layout.addWidget(self.original_edit_status_label)
+        text_layout.addWidget(self.original_text_box)
         text_layout.addWidget(QLabel("译文:"))
         text_layout.addWidget(self.translated_text_box)
         insert_buttons_layout = QHBoxLayout()
