@@ -148,14 +148,14 @@ def detect_gpu():
         try:
             # 尝试运行 nvidia-smi 获取驱动版本
             cmd = 'nvidia-smi --query-gpu=driver_version --format=csv,noheader'
-            output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+            output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
             driver_version = output.strip().split('\n')[0].strip()
             
             # 尝试从nvidia-smi直接输出获取CUDA版本
             # nvidia-smi输出的第一行通常包含CUDA版本信息
             try:
                 cmd_full = 'nvidia-smi'
-                full_output = subprocess.check_output(cmd_full, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                full_output = subprocess.check_output(cmd_full, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 # 解析 "CUDA Version: X.Y" 格式
                 import re
                 cuda_match = re.search(r'CUDA Version:\s*(\d+\.\d+)', full_output)
@@ -178,7 +178,7 @@ def detect_gpu():
             # 方法1: 尝试 PowerShell Get-CimInstance（Windows 8+，无需额外工具）
             try:
                 cmd = 'powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"'
-                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -192,7 +192,7 @@ def detect_gpu():
             # 方法2: 尝试 wmic（经典方法，兼容老系统）
             try:
                 cmd = 'wmic path win32_VideoController get name'
-                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -206,7 +206,7 @@ def detect_gpu():
             # 方法3: 尝试 PowerShell Get-WmiObject（更老的 PowerShell）
             try:
                 cmd = 'powershell -NoProfile -Command "Get-WmiObject Win32_VideoController | Select-Object -ExpandProperty Name"'
-                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -220,7 +220,7 @@ def detect_gpu():
             # 方法4: 尝试读取注册表（最底层的方法）
             try:
                 cmd = 'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000" /v DriverDesc'
-                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -264,7 +264,7 @@ def detect_gpu():
         else:
             # Linux/Mac: 使用lspci或其他工具
             try:
-                output = subprocess.check_output("lspci | grep -i vga", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                output = subprocess.check_output("lspci | grep -i vga", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -277,7 +277,7 @@ def detect_gpu():
             
             # 尝试使用 lshw
             try:
-                output = subprocess.check_output("lshw -C display 2>/dev/null | grep 'product:'", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5)
+                output = subprocess.check_output("lshw -C display 2>/dev/null | grep 'product:'", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -972,4 +972,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
