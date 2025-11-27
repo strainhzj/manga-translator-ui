@@ -466,6 +466,127 @@ class MainAppLogic(QObject):
             "secondary_ocr": [member.value for member in Ocr]
         }
         return options_map.get(key)
+    @pyqtSlot()
+    def export_config(self):
+        """导出配置（排除敏感信息）"""
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        import json
+        
+        try:
+            # 选择保存位置
+            file_path, _ = QFileDialog.getSaveFileName(
+                None,
+                "导出配置",
+                "manga_translator_config.json",
+                "JSON Files (*.json)"
+            )
+            
+            if not file_path:
+                return
+            
+            # 获取当前配置
+            config = self.config_service.get_config()
+            config_dict = config.dict()
+            
+            # 排除敏感信息和临时状态
+            # 1. 排除 app 配置（包含路径等临时信息）
+            if 'app' in config_dict:
+                del config_dict['app']
+            
+            # 2. 排除 CLI 中的临时状态
+            if 'cli' in config_dict:
+                # 保留 CLI 配置，但排除某些临时字段
+                cli_exclude = ['verbose']  # 可以根据需要添加更多
+                for key in cli_exclude:
+                    if key in config_dict['cli']:
+                        del config_dict['cli'][key]
+            
+            # 保存到文件
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(config_dict, f, indent=2, ensure_ascii=False)
+            
+            self.logger.info(f"配置已导出到: {file_path}")
+            QMessageBox.information(
+                None,
+                "导出成功",
+                f"配置已成功导出到：\n{file_path}\n\n注意：API密钥等敏感信息未包含在导出文件中。"
+            )
+            
+        except Exception as e:
+            self.logger.error(f"导出配置失败: {e}")
+            QMessageBox.critical(
+                None,
+                "导出失败",
+                f"导出配置时发生错误：\n{str(e)}"
+            )
+    
+    @pyqtSlot()
+    def import_config(self):
+        """导入配置（保留现有的敏感信息）"""
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        import json
+        
+        try:
+            # 选择要导入的文件
+            file_path, _ = QFileDialog.getOpenFileName(
+                None,
+                "导入配置",
+                "",
+                "JSON Files (*.json)"
+            )
+            
+            if not file_path:
+                return
+            
+            # 读取导入的配置
+            with open(file_path, 'r', encoding='utf-8') as f:
+                imported_config = json.load(f)
+            
+            # 获取当前配置
+            current_config = self.config_service.get_config()
+            current_dict = current_config.dict()
+            
+            # 保留当前的 app 配置（路径等临时信息）
+            preserved_app = current_dict.get('app', {})
+            
+            # 深度合并配置
+            def deep_update(target, source):
+                for key, value in source.items():
+                    if isinstance(value, dict) and key in target and isinstance(target[key], dict):
+                        deep_update(target[key], value)
+                    else:
+                        target[key] = value
+            
+            # 合并导入的配置到当前配置
+            deep_update(current_dict, imported_config)
+            
+            # 恢复 app 配置
+            current_dict['app'] = preserved_app
+            
+            # 更新配置
+            from core.config_models import AppSettings
+            new_config = AppSettings.parse_obj(current_dict)
+            self.config_service.set_config(new_config)
+            self.config_service.save_config_file()
+            
+            # 通知UI更新 - 使用转换后的配置字典
+            config_dict_for_ui = self.config_service._convert_config_for_ui(new_config.dict())
+            self.config_loaded.emit(config_dict_for_ui)
+            
+            self.logger.info(f"配置已从 {file_path} 导入")
+            QMessageBox.information(
+                None,
+                "导入成功",
+                f"配置已成功导入！\n\n来源：{file_path}\n\n注意：您的API密钥等敏感信息已保留，未被覆盖。"
+            )
+            
+        except Exception as e:
+            self.logger.error(f"导入配置失败: {e}")
+            QMessageBox.critical(
+                None,
+                "导入失败",
+                f"导入配置时发生错误：\n{str(e)}\n\n请确保文件格式正确。"
+            )
     # endregion
 
     # region 文件管理
