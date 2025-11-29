@@ -687,7 +687,8 @@ class FolderDialog(QDialog):
                 border: none;
             }}
             QTreeView::item:hover {{
-                background-color: {palette.color(QPalette.ColorRole.Light).name()};
+                background-color: {palette.color(QPalette.ColorRole.Highlight).name()};
+                color: {palette.color(QPalette.ColorRole.HighlightedText).name()};
             }}
             QTreeView::item:selected {{
                 background-color: {palette.color(QPalette.ColorRole.Highlight).name()};
