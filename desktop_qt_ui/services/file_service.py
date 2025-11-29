@@ -185,16 +185,19 @@ class FileService:
         生成自然排序的键，支持数字排序
         例如: file1.jpg, file2.jpg, file10.jpg 会按 1, 2, 10 排序
         而不是按字符串 1, 10, 2 排序
+        
+        对于包含路径的文件，会对整个路径进行自然排序，确保子文件夹也能正确排序
+        例如: 第1话/001.jpg, 第2话/001.jpg, 第10话/001.jpg 会按 1, 2, 10 排序
         """
         import re
         
-        # 获取文件名（不含路径）
-        filename = os.path.basename(path)
+        # 规范化路径分隔符
+        normalized_path = path.replace('\\', '/')
         
-        # 将文件名分割成文本和数字部分
-        # 例如: "page123abc456.jpg" -> ["page", 123, "abc", 456, ".jpg"]
+        # 将整个路径分割成文本和数字部分
+        # 例如: "folder/第1话/page001.jpg" -> ["folder/第", 1, "话/page", 1, ".jpg"]
         parts = []
-        for part in re.split(r'(\d+)', filename):
+        for part in re.split(r'(\d+)', normalized_path):
             if part.isdigit():
                 # 数字部分转换为整数，用于数值比较
                 parts.append(int(part))
