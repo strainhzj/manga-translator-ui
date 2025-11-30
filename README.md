@@ -220,6 +220,16 @@ python -m manga_translator --help
 
 ---
 
+## ⭐ Star 趋势
+
+<div align="center">
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hgmzhn/manga-translator-ui&type=Date)](https://star-history.com/#hgmzhn/manga-translator-ui&Date)
+
+</div>
+
+---
+
 ## 🙏 致谢
 
 - [zyddnys/manga-image-translator](https://github.com/zyddnys/manga-image-translator) - 核心翻译引擎
