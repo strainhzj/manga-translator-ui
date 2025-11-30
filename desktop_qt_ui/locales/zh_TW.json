@@ -27,13 +27,13 @@
   "Select or drag output folder...": "選擇或拖曳輸出資料夾...",
   "Browse...": "瀏覽...",
   "Open": "開啟",
-  "Translation Workflow Mode:": "翻譯工作流程模式：",
-  "Normal Translation": "一般翻譯",
+  "Translation Workflow Mode:": "翻譯流程模式：",
+  "Normal Translation": "正常翻譯流程",
   "Export Translation": "匯出翻譯",
   "Export Original Text": "匯出原文",
   "Import Translation and Render": "匯入翻譯並渲染",
   "Colorize Only": "僅上色",
-  "Upscale Only": "僅放大",
+  "Upscale Only": "僅超分",
   "Start Translation": "開始翻譯",
   "Export Config": "匯出設定",
   "Import Config": "匯入設定",
@@ -354,5 +354,7 @@
   "label_max_font_size": "最大字型大小",
   "Mark selected text as horizontal display": "標記選取文字为橫排顯示",
   "📥 Importing translations from TXT files to JSON...": "📥 正在从TXT檔案匯入翻譯到JSON...",
-  "upscale_ratio_not_use": "不使用"
+  "upscale_ratio_not_use": "不使用",
+  "Inpaint Only": "僅修復",
+  "Start Inpainting": "開始修復"
 }

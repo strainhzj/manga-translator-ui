@@ -390,11 +390,42 @@ class EditorView(QWidget):
 
     @pyqtSlot(str)
     def _on_file_remove_requested(self, file_path: str):
-        """处理文件移除请求：先在视图中移除，再更新逻辑层"""
-        # 先在视图中移除文件（不会触发重新构建）
+        """处理文件移除请求：先在视图中移除，再调用app_logic同步"""
+        import os
+        
+        # 如果是翻译后的文件/文件夹，需要找到对应的源文件/文件夹
+        source_path, translated_path = self.logic._find_file_pair(file_path)
+        
+        # 如果是文件夹，需要特殊处理
+        if os.path.isdir(file_path):
+            # 翻译后的文件夹，需要找到对应的源文件夹
+            # 从 file_to_folder_map 中查找任意一个文件，获取其源文件夹
+            source_folder = None
+            for src_file, folder in self.app_logic.file_to_folder_map.items():
+                if folder:
+                    # 检查这个文件是否在当前要删除的翻译文件夹内
+                    # 通过文件名匹配（因为翻译文件夹和源文件夹的文件名相同）
+                    try:
+                        # 获取源文件的文件名
+                        src_filename = os.path.basename(src_file)
+                        # 检查翻译文件夹中是否有同名文件
+                        translated_file = os.path.join(file_path, src_filename)
+                        if os.path.exists(translated_file):
+                            source_folder = folder
+                            break
+                    except:
+                        pass
+            
+            path_to_remove = source_folder if source_folder else file_path
+        else:
+            # 单个文件，使用 _find_file_pair 的结果
+            path_to_remove = source_path if source_path else file_path
+        
+        # 先在视图中移除（避免重建列表）
         self.file_list.remove_file(file_path)
-        # 然后更新逻辑层的数据（不发射信号）
-        self.logic.remove_file(file_path, emit_signal=False)
+        
+        # 再调用app_logic同步数据
+        self.app_logic.remove_file(path_to_remove)
     
     @pyqtSlot(list)
     def update_file_list(self, files: list):

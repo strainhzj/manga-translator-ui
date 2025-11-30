@@ -219,7 +219,7 @@
   "Normal Translation": "通常翻訳",
   "Export Original Text": "原文をエクスポート",
   "Import Translation and Render": "翻訳をインポートしてレンダリング",
-  "Colorize Only": "着色のみ",
+  "Colorize Only": "カラー化のみ",
   "Upscale Only": "アップスケールのみ",
   "Start Colorizing": "着色を開始",
   "Start Upscaling": "アップスケールを開始",
@@ -354,5 +354,7 @@
   "📊 Sequential processing mode: {total} images": "📊 順次処理モード：{total}枚の画像",
   "📥 Importing translations from TXT files to JSON...": "📥 TXTファイルからJSONに翻訳をインポート中...",
   "Import result: {result}": "インポート結果：{result}",
-  "⚠️ Warning: Cannot find template file, skipping auto-import": "⚠️ 警告：テンプレートファイルが見つかりません、自動インポートをスキップします"
+  "⚠️ Warning: Cannot find template file, skipping auto-import": "⚠️ 警告：テンプレートファイルが見つかりません、自動インポートをスキップします",
+  "Inpaint Only": "修復のみ",
+  "Start Inpainting": "修復を開始"
 }

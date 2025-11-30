@@ -477,6 +477,21 @@ async def colorize_only(req: Request, image: UploadFile = File(...), config: str
     else:
         raise HTTPException(500, detail="Colorization failed")
 
+@app.post("/translate/inpaint", response_class=StreamingResponse, tags=["api", "process"])
+async def inpaint_only(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+    """仅修复（检测文字并修复图片）"""
+    img = await image.read()
+    conf = parse_config(config)
+    ctx = await get_ctx(req, conf, img, "inpaint_only")
+    
+    if ctx.result:
+        img_byte_arr = io.BytesIO()
+        ctx.result.save(img_byte_arr, format="PNG")
+        img_byte_arr.seek(0)
+        return StreamingResponse(img_byte_arr, media_type="image/png")
+    else:
+        raise HTTPException(500, detail="Inpainting failed")
+
 @app.post("/translate/import/json", response_class=StreamingResponse, tags=["api", "import"])
 async def import_json_and_render(req: Request, image: UploadFile = File(...), json_file: UploadFile = File(...), config: str = Form("{}")):
     """导入 JSON + 图片，返回渲染后的图片（load_text workflow）"""
@@ -821,6 +836,13 @@ async def colorize_only_stream(req: Request, image: UploadFile = File(...), conf
     img = await image.read()
     conf = parse_config(config)
     return await while_streaming(req, transform_to_image, conf, img, "colorize_only")
+
+@app.post("/translate/inpaint/stream", response_class=StreamingResponse, tags=["api", "process", "stream"])
+async def inpaint_only_stream(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+    """仅修复（流式，支持进度）"""
+    img = await image.read()
+    conf = parse_config(config)
+    return await while_streaming(req, transform_to_image, conf, img, "inpaint_only")
 
 
 

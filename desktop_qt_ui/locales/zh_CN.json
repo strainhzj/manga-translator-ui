@@ -213,7 +213,7 @@
   "Start Translation": "开始翻译",
   "Stop Translation": "停止翻译",
   "Export Translation": "导出翻译",
-  "Translation Workflow Mode:": "翻译流程模式:",
+  "Translation Workflow Mode:": "翻译流程模式：",
   "Output Directory:": "输出目录:",
   "Log output...": "日志输出...",
   "Normal Translation": "正常翻译流程",
@@ -354,5 +354,7 @@
   "📊 Sequential processing mode: {total} images": "📊 顺序处理模式：共 {total} 张图片",
   "📥 Importing translations from TXT files to JSON...": "📥 正在从TXT文件导入翻译到JSON...",
   "Import result: {result}": "导入结果：{result}",
-  "⚠️ Warning: Cannot find template file, skipping auto-import": "⚠️ 警告：无法找到模板文件，跳过自动导入翻译"
+  "⚠️ Warning: Cannot find template file, skipping auto-import": "⚠️ 警告：无法找到模板文件，跳过自动导入翻译",
+  "Inpaint Only": "仅修复",
+  "Start Inpainting": "开始修复"
 }

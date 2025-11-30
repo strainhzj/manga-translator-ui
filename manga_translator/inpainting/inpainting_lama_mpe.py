@@ -269,6 +269,16 @@ class LamaMPEInpainter(OfflineInpainter):
             img_inpainted = ((img_inpainted_torch.cpu().squeeze_(0).permute(1, 2, 0).numpy() + 1.0) * 127.5).astype(np.uint8)
         if new_h != height or new_w != width:
             img_inpainted = cv2.resize(img_inpainted, (width, height), interpolation = cv2.INTER_LINEAR)
+        
+        # 确保所有数组尺寸匹配
+        self.logger.debug(f"Before blend - img_inpainted: {img_inpainted.shape}, img_original: {img_original.shape}, mask_original: {mask_original.shape}")
+        
+        # 如果mask_original尺寸不匹配，resize它
+        if mask_original.shape[:2] != img_inpainted.shape[:2]:
+            self.logger.warning(f"Resizing mask_original from {mask_original.shape} to match img_inpainted {img_inpainted.shape[:2]}")
+            mask_original = cv2.resize(mask_original, (img_inpainted.shape[1], img_inpainted.shape[0]), interpolation = cv2.INTER_LINEAR)
+            mask_original = mask_original[:, :, None] if len(mask_original.shape) == 2 else mask_original
+        
         ans = img_inpainted * mask_original + img_original * (1 - mask_original)
         
         return ans

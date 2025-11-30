@@ -122,6 +122,7 @@ class CliSettings(BaseModel):
     generate_and_export: bool = False
     colorize_only: bool = False
     upscale_only: bool = False  # 仅超分模式
+    inpaint_only: bool = False  # 仅输出修复图片模式
 
 class AppSection(BaseModel):
     last_open_dir: str = '.'

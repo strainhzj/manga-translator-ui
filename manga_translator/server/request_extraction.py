@@ -83,6 +83,8 @@ def prepare_translator_params(config: Config, workflow: str = "normal") -> dict:
             config.cli.upscale_only = False
         if hasattr(config.cli, 'colorize_only'):
             config.cli.colorize_only = False
+        if hasattr(config.cli, 'inpaint_only'):
+            config.cli.inpaint_only = False
         
         # 忽略 GPU 设置（由服务器启动参数控制）
         if hasattr(config.cli, 'use_gpu'):

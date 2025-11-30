@@ -215,11 +215,13 @@ class EditorLogic(QObject):
                 else:
                     single_files.append(file_path)
             
-            # 构建文件列表：先是文件夹，再是单独文件
+            # 构建文件列表：按文件夹分组，但只添加文件，不添加文件夹路径
+            # 这样可以保持文件夹分组的顺序，但不会让FileListView重新展开文件夹
             grouped_list = []
             for folder, files in sorted(folder_groups.items()):
-                grouped_list.append(folder)  # 添加文件夹路径
-                # 注意：FileListView 会自动展开文件夹
+                # 只添加文件，不添加文件夹路径
+                # 文件会按文件夹分组显示，但不会重新展开文件夹
+                grouped_list.extend(files)
             grouped_list.extend(single_files)  # 添加单独的文件
             
             self.file_list_changed.emit(grouped_list)

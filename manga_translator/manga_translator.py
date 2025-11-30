@@ -264,6 +264,7 @@ class MangaTranslator:
         self.generate_and_export = params.get('generate_and_export', False)
         self.colorize_only = params.get('colorize_only', False)
         self.upscale_only = params.get('upscale_only', False)
+        self.inpaint_only = params.get('inpaint_only', False)
         
         
         # batch_concurrent 已在初始化时设置并验证
@@ -2706,6 +2707,123 @@ class MangaTranslator:
             await self._report_progress('upscale-only-complete', True)
             return ctx
 
+        # --- Inpaint Only Mode Check (for batch processing) ---
+        if self.inpaint_only:
+            logger.info("=== Inpaint Only Mode ===")
+            logger.info("Pipeline: Detection → Fill Text → Textline Merge → Mask Refinement → Inpainting")
+            
+            ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
+            
+            # Step 1: 检测 - 获取textlines（检测框）和mask_raw（原始蒙版）
+            await self._report_progress('detection')
+            try:
+                ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_detection(config, ctx)
+                logger.info(f"✓ Step 1 - Detection: Found {len(ctx.textlines) if ctx.textlines else 0} textlines")
+                logger.info(f"  - mask_raw: {ctx.mask_raw.shape if ctx.mask_raw is not None else 'None'}")
+                if ctx.mask_raw is not None:
+                    logger.info(f"  - mask_raw non-zero pixels: {np.count_nonzero(ctx.mask_raw)}")
+            except Exception as e:
+                logger.error(f"Error during detection:\n{traceback.format_exc()}")
+                if not self.ignore_errors:
+                    raise
+                ctx.textlines = []
+                ctx.mask_raw = None
+                ctx.mask = None
+            
+            if not ctx.textlines or ctx.mask_raw is None:
+                logger.warning("No textlines or mask_raw detected, skipping inpainting.")
+                ctx.img_inpainted = ctx.img_rgb
+                ctx.result = ctx.img_inpainted
+                ctx.text_regions = []
+                await self._report_progress('inpaint-only-complete', True)
+                return ctx
+            
+            # Step 2: 填充文本 - 跳过OCR，为每个textline填充占位文本
+            for textline in ctx.textlines:
+                textline.text = "TEXT"
+            logger.info(f"✓ Step 2 - Fill Text: Filled {len(ctx.textlines)} textlines with placeholder 'TEXT'")
+            
+            # Step 3: Textline Merge - 将textlines合并成text_regions（大框）
+            try:
+                ctx.text_regions = await dispatch_textline_merge(
+                    ctx.textlines, 
+                    ctx.img_rgb.shape[1], 
+                    ctx.img_rgb.shape[0],
+                    config, 
+                    verbose=self.verbose
+                )
+                logger.info(f"✓ Step 3 - Textline Merge: Merged {len(ctx.textlines)} textlines into {len(ctx.text_regions)} text_regions")
+            except Exception as e:
+                logger.error(f"Error during textline merge:\n{traceback.format_exc()}")
+                # 降级：为每个textline创建一个简单的TextBlock
+                logger.warning("Falling back to simple text_regions (1 textline = 1 region)")
+                ctx.text_regions = []
+                for textline in ctx.textlines:
+                    region = TextBlock(
+                        lines=[textline.pts],
+                        texts=["TEXT"],
+                        font_size=int(textline.font_size) if hasattr(textline, 'font_size') else 20,
+                        angle=0,
+                        prob=textline.prob if hasattr(textline, 'prob') else 1.0,
+                        fg_color=(0, 0, 0),
+                        bg_color=(255, 255, 255)
+                    )
+                    ctx.text_regions.append(region)
+                logger.info(f"Created {len(ctx.text_regions)} simple text_regions")
+            
+            if not ctx.text_regions:
+                logger.warning("No text_regions created, skipping mask refinement and inpainting.")
+                ctx.img_inpainted = ctx.img_rgb
+                ctx.result = ctx.img_inpainted
+                await self._report_progress('inpaint-only-complete', True)
+                return ctx
+            
+            # Step 4: Mask Refinement - 使用text_regions和mask_raw优化蒙版
+            await self._report_progress('mask-generation')
+            try:
+                ctx.mask = await self._run_mask_refinement(config, ctx)
+                mask_pixels = np.count_nonzero(ctx.mask) if ctx.mask is not None else 0
+                logger.info(f"✓ Step 4 - Mask Refinement: Generated mask with {mask_pixels} non-zero pixels")
+            except Exception as e:
+                logger.error(f"Error during mask refinement:\n{traceback.format_exc()}")
+                # 降级到简单膨胀
+                logger.warning("Falling back to simple mask dilation")
+                kernel = np.ones((config.kernel_size, config.kernel_size), np.uint8)
+                ctx.mask = cv2.dilate(ctx.mask_raw, kernel, iterations=config.mask_dilation_offset // config.kernel_size)
+                mask_pixels = np.count_nonzero(ctx.mask) if ctx.mask is not None else 0
+                logger.info(f"Simple dilated mask has {mask_pixels} non-zero pixels")
+            
+            # Step 5: Inpainting - 使用优化后的mask进行修复
+            if ctx.mask is None or np.count_nonzero(ctx.mask) == 0:
+                logger.warning("Mask is empty! Skipping inpainting.")
+                ctx.img_inpainted = ctx.img_rgb
+            else:
+                await self._report_progress('inpainting')
+                try:
+                    ctx.img_inpainted = await self._run_inpainting(config, ctx)
+                    logger.info(f"✓ Step 5 - Inpainting: Completed successfully")
+                except Exception as e:
+                    logger.error(f"Error during inpainting:\n{traceback.format_exc()}")
+                    if not self.ignore_errors:
+                        raise
+                    ctx.img_inpainted = ctx.img_rgb
+            
+            # 设置结果 - 转换为PIL Image（保存函数需要PIL格式）
+            from PIL import Image
+            if isinstance(ctx.img_inpainted, np.ndarray):
+                ctx.result = Image.fromarray(ctx.img_inpainted)
+            else:
+                ctx.result = ctx.img_inpainted
+            
+            ctx.text_regions = []
+            
+            # 设置标志，告诉_complete_translation_pipeline跳过处理
+            ctx.inpaint_only_complete = True
+            
+            logger.info("=== Inpaint Only Mode Complete ===")
+            await self._report_progress('inpaint-only-complete', True)
+            return ctx
+
         ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
 
         # -- Detection
@@ -3524,6 +3642,11 @@ class MangaTranslator:
         完成翻译后的处理步骤（掩码细化、修复、渲染）
         """
         await self._report_progress('after-translating')
+
+        # Inpaint Only Mode: Skip pipeline, ctx.result already set
+        if hasattr(ctx, 'inpaint_only_complete') and ctx.inpaint_only_complete:
+            logger.info("Skipping _complete_translation_pipeline (inpaint only mode already complete)")
+            return ctx
 
         # Colorize Only Mode: Skip validation, ctx.result should already be set
         if self.colorize_only:

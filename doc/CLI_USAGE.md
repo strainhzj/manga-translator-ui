@@ -451,6 +451,8 @@ if response.status_code == 200:
 - `POST /translate/upscale/stream` - 仅超分（流式，支持进度）
 - `POST /translate/colorize` - 仅上色（返回彩色图片）
 - `POST /translate/colorize/stream` - 仅上色（流式，支持进度）
+- `POST /translate/inpaint` - 仅修复（检测文字并修复图片）
+- `POST /translate/inpaint/stream` - 仅修复（流式，支持进度）
 
 **导入端点**（导入翻译并渲染）：
 - `POST /translate/import/json` - 导入 JSON + 图片，返回渲染后的图片

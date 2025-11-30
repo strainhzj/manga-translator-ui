@@ -81,6 +81,29 @@ class OpenAITranslator(CommonTranslator):
                 base_url=self.base_url
             )
     
+    async def _cleanup(self):
+        """清理资源"""
+        if self.client:
+            try:
+                await self.client.close()
+            except Exception:
+                pass  # 忽略清理时的错误
+    
+    def __del__(self):
+        """析构函数，确保资源被清理"""
+        if self.client:
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 如果事件循环还在运行，创建清理任务
+                    asyncio.create_task(self._cleanup())
+                elif not loop.is_closed():
+                    # 如果事件循环未关闭，同步执行清理
+                    loop.run_until_complete(self._cleanup())
+            except Exception:
+                pass  # 忽略所有清理错误
+    
     def _build_system_prompt(self, source_lang: str, target_lang: str, custom_prompt_json: Dict[str, Any] = None, line_break_prompt_json: Dict[str, Any] = None) -> str:
         """构建系统提示词"""
         # Map language codes to full names for clarity in the prompt

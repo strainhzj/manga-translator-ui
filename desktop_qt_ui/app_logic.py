@@ -747,10 +747,39 @@ class MainAppLogic(QObject):
             # 情况1：直接在 source_files 中（文件夹或单独添加的文件）
             if norm_file_path in self.source_files:
                 self.source_files.remove(norm_file_path)
+                # 如果是文件，清理 file_to_folder_map
+                if norm_file_path in self.file_to_folder_map:
+                    del self.file_to_folder_map[norm_file_path]
                 self.file_removed.emit(file_path)
                 return
             
-            # 情况2：文件夹内的单个文件（只处理文件，不处理文件夹）
+            # 情况2：文件夹路径（通过单独添加文件自动分组的）
+            if os.path.isdir(norm_file_path):
+                # 删除该文件夹下的所有文件
+                files_to_remove = []
+                for source_file in self.source_files:
+                    if os.path.isfile(source_file):
+                        try:
+                            # 检查文件是否在这个文件夹内
+                            common = os.path.commonpath([norm_file_path, source_file])
+                            if common == norm_file_path:
+                                files_to_remove.append(source_file)
+                        except ValueError:
+                            # 不同驱动器，跳过
+                            continue
+                
+                # 移除所有找到的文件
+                for f in files_to_remove:
+                    self.source_files.remove(f)
+                    # 同时清理 file_to_folder_map
+                    if f in self.file_to_folder_map:
+                        del self.file_to_folder_map[f]
+                
+                if files_to_remove:
+                    self.file_removed.emit(file_path)
+                    return
+            
+            # 情况3：文件夹内的单个文件（只处理文件，不处理文件夹）
             if os.path.isfile(norm_file_path):
                 # 检查这个文件是否来自某个文件夹
                 parent_folder = None
@@ -785,6 +814,10 @@ class MainAppLogic(QObject):
                     # 如果还有剩余文件，将它们作为单独的文件添加回去
                     if remaining_files:
                         self.source_files.extend(remaining_files)
+                        # 更新 file_to_folder_map：这些文件现在仍然属于原文件夹
+                        # 保持文件夹映射关系，以便输出路径计算正确
+                        for f in remaining_files:
+                            self.file_to_folder_map[f] = parent_folder
                     
                     self.file_removed.emit(file_path)
                     return
@@ -812,7 +845,9 @@ class MainAppLogic(QObject):
         按文件夹分组排序：先对文件夹进行排序，然后对每个文件夹内的图片排序。
         """
         resolved_files = []
-        self.file_to_folder_map.clear()  # 清空旧的映射
+        # 保存旧的映射，用于处理删除文件后的情况
+        old_map = self.file_to_folder_map.copy()
+        self.file_to_folder_map.clear()
 
         # 分离文件和文件夹
         folders = []
@@ -841,8 +876,13 @@ class MainAppLogic(QObject):
         individual_files.sort(key=self.file_service._natural_sort_key)
         for file_path in individual_files:
             resolved_files.append(file_path)
-            # 单独添加的文件，不属于任何文件夹
-            self.file_to_folder_map[file_path] = None
+            # 检查是否有旧的文件夹映射（删除文件后剩余的文件）
+            if file_path in old_map and old_map[file_path] is not None:
+                # 保留原来的文件夹映射
+                self.file_to_folder_map[file_path] = old_map[file_path]
+            else:
+                # 真正单独添加的文件，不属于任何文件夹
+                self.file_to_folder_map[file_path] = None
 
         return list(dict.fromkeys(resolved_files)) # Return unique files
 

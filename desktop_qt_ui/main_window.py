@@ -188,6 +188,8 @@ class MainWindow(QMainWindow):
         self.app_logic.files_added.connect(self.main_view.file_list.add_files)
         self.app_logic.files_cleared.connect(self.main_view.file_list.clear)
         self.app_logic.file_removed.connect(self.main_view.file_list.remove_file)
+        self.app_logic.file_removed.connect(self._on_file_removed_update_editor)
+        self.app_logic.files_cleared.connect(self._on_files_cleared_update_editor)
         self.app_logic.output_path_updated.connect(self.main_view.update_output_path_display)
         self.app_logic.task_completed.connect(self.on_task_completed, type=Qt.ConnectionType.QueuedConnection)
         self.app_logic.log_message.connect(self.main_view.append_log)
@@ -227,6 +229,57 @@ class MainWindow(QMainWindow):
         """
         self.logger.info(f"File double-clicked from main list: {file_path}. Switching to editor.")
         self.enter_editor_mode(file_to_load=file_path)
+    
+    def _on_file_removed_update_editor(self, file_path: str):
+        """当文件被移除时，更新编辑器"""
+        if self.stacked_widget.currentWidget() == self.editor_view:
+            # 检查当前加载的图片是否被移除
+            current_image = self.editor_controller.model.get_source_image_path()
+            should_clear_canvas = False
+            
+            if current_image:
+                import os
+                norm_current = os.path.normpath(current_image)
+                norm_removed = os.path.normpath(file_path)
+                
+                # 如果移除的是当前图片
+                if norm_current == norm_removed:
+                    should_clear_canvas = True
+                # 如果移除的是文件夹，检查当前图片是否在该文件夹内
+                elif os.path.isdir(file_path):
+                    try:
+                        # 检查当前图片是否在被移除的文件夹内
+                        if os.path.commonpath([norm_current, norm_removed]) == norm_removed:
+                            should_clear_canvas = True
+                    except ValueError:
+                        # 不同驱动器，跳过
+                        pass
+            
+            # 如果需要清空画布
+            if should_clear_canvas:
+                self.editor_controller.model.set_image(None)
+                self.editor_controller._clear_editor_state()
+            
+            # 检查是否还有文件
+            if not self.app_logic.source_files:
+                # 没有文件了，清空编辑器
+                self.editor_logic.clear_list()
+                # 如果画布还没清空，清空它
+                if not should_clear_canvas:
+                    self.editor_controller.model.set_image(None)
+                    self.editor_controller._clear_editor_state()
+            # 如果还有文件，不需要重建列表，因为视图已经在 _on_file_remove_requested 中移除了
+    
+    def _on_files_cleared_update_editor(self):
+        """当文件列表被清空时，清空编辑器"""
+        if self.stacked_widget.currentWidget() == self.editor_view:
+            # 如果当前在编辑器视图，清空编辑器
+            self.logger.info("Files cleared. Clearing editor.")
+            # 清空文件列表
+            self.editor_logic.clear_list()
+            # 清空画布
+            self.editor_controller.model.set_image(None)
+            self.editor_controller._clear_editor_state()
 
     def _change_language(self, locale_code: str):
         """切换语言"""
@@ -345,24 +398,19 @@ class MainWindow(QMainWindow):
     def enter_editor_mode(self, file_to_load: str = None, files_to_load: list = None):
         """
         Switches to the editor view and loads the necessary files.
+        file_to_load: 单个文件路径（双击文件时使用）
         files_to_load: 翻译后的文件列表
         """
         import os
 
-        # 展开文件夹为文件列表，但保留文件夹信息
-        expanded_files = []
-        folder_map = {}  # 文件到文件夹的映射
+        # 使用app_logic的_resolve_input_files来获取正确的文件列表
+        # 这样可以正确处理文件夹展开和文件移除
+        expanded_files = self.app_logic._resolve_input_files()
+        folder_map = self.app_logic.file_to_folder_map.copy()
         
-        for path in self.app_logic.source_files:
-            if os.path.isdir(path):
-                # 展开文件夹
-                folder_files = self.app_logic.file_service.get_image_files_from_folder(path, recursive=True)
-                for f in folder_files:
-                    folder_map[f] = path  # 记录文件来自哪个文件夹
-                expanded_files.extend(folder_files)
-            elif os.path.isfile(path):
-                expanded_files.append(path)
-                folder_map[path] = None  # 单独的文件
+        self.logger.info(f"Entering editor mode: {len(expanded_files)} files from source_files")
+        self.logger.debug(f"Source files: {self.app_logic.source_files}")
+        self.logger.debug(f"Expanded files (first 5): {expanded_files[:5] if len(expanded_files) > 5 else expanded_files}")
 
         # 传递翻译后的图片列表给编辑器
         # 从file_to_folder_map获取翻译后的图片路径
@@ -392,6 +440,7 @@ class MainWindow(QMainWindow):
                     translated_folder_map[translated_file] = None
 
         # 传递文件列表和文件夹映射
+        # folder_map只包含实际存在的文件，不会导致重新展开
         self.editor_logic.load_file_lists(
             source_files=expanded_files, 
             translated_files=translated_files,

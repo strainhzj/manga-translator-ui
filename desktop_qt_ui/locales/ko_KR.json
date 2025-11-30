@@ -213,7 +213,7 @@
   "Start Translation": "번역 시작",
   "Stop Translation": "번역 중지",
   "Export Translation": "번역 내보내기",
-  "Translation Workflow Mode:": "번역 워크플로 모드:",
+  "Translation Workflow Mode:": "번역 워크플로 모드",
   "Output Directory:": "출력 디렉토리:",
   "Log output...": "로그 출력...",
   "Normal Translation": "일반 번역",
@@ -354,5 +354,7 @@
   "📊 Sequential processing mode: {total} images": "📊 순차 처리 모드: {total}개 이미지",
   "📥 Importing translations from TXT files to JSON...": "📥 TXT 파일에서 JSON으로 번역 가져오는 중...",
   "Import result: {result}": "가져오기 결과: {result}",
-  "⚠️ Warning: Cannot find template file, skipping auto-import": "⚠️ 경고: 템플릿 파일을 찾을 수 없어 자동 가져오기를 건너뜁니다"
+  "⚠️ Warning: Cannot find template file, skipping auto-import": "⚠️ 경고: 템플릿 파일을 찾을 수 없어 자동 가져오기를 건너뜁니다",
+  "Inpaint Only": "복원만",
+  "Start Inpainting": "복원 시작"
 }
