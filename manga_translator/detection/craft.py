@@ -195,7 +195,7 @@ class CRAFTDetector(OfflineDetector):
         mask = cv2.dilate(mask, kern)
 
         textlines = [Quadrilateral(pts.astype(int), '', 1) for pts in polys_ret]
-        textlines = list(filter(lambda q: q.area > 16, textlines))
+        textlines = list(filter(lambda q: q.area > 16, textlines))  # 保留最小面积过滤
 
         # ✅ Detection完成后立即清理GPU内存
         del x, y, y_refiner, feature

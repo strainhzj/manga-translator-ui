@@ -539,6 +539,14 @@ class FolderDialog(QDialog):
         splitter.addWidget(shortcuts_widget)
 
         # 右侧文件夹树形视图
+        # 计算hover背景色（与左侧一致）
+        highlight_color = palette.color(QPalette.ColorRole.Highlight)
+        base_color = palette.color(QPalette.ColorRole.Base)
+        hover_r = int(highlight_color.red() * 0.4 + base_color.red() * 0.6)
+        hover_g = int(highlight_color.green() * 0.4 + base_color.green() * 0.6)
+        hover_b = int(highlight_color.blue() * 0.4 + base_color.blue() * 0.6)
+        folder_hover_bg = f"rgb({hover_r}, {hover_g}, {hover_b})"
+        
         self.folder_tree = QTreeView()
         self.folder_tree.setModel(self.proxy_model)
         self.folder_tree.setStyleSheet(f"""
@@ -555,7 +563,8 @@ class FolderDialog(QDialog):
                 border: none;
             }}
             QTreeView::item:hover {{
-                background-color: {palette.color(QPalette.ColorRole.AlternateBase).name()};
+                background-color: {folder_hover_bg};
+                color: {palette.color(QPalette.ColorRole.Text).name()};
             }}
             QTreeView::item:selected {{
                 background-color: #0078d4;
@@ -668,6 +677,16 @@ class FolderDialog(QDialog):
         from PyQt6.QtGui import QPalette
         palette = self.palette()
         
+        # 计算hover时的背景色（高亮色的浅色版本）
+        highlight_color = palette.color(QPalette.ColorRole.Highlight)
+        bg_color = palette.color(QPalette.ColorRole.Window)
+        
+        # 混合高亮色和背景色（40%高亮色 + 60%背景色）
+        hover_bg_r = int(highlight_color.red() * 0.4 + bg_color.red() * 0.6)
+        hover_bg_g = int(highlight_color.green() * 0.4 + bg_color.green() * 0.6)
+        hover_bg_b = int(highlight_color.blue() * 0.4 + bg_color.blue() * 0.6)
+        hover_bg_final = f"rgb({hover_bg_r}, {hover_bg_g}, {hover_bg_b})"
+        
         widget = QWidget()
         widget.setMinimumWidth(180)
         widget.setMaximumWidth(280)
@@ -703,8 +722,8 @@ class FolderDialog(QDialog):
                 border: none;
             }}
             QTreeView::item:hover {{
-                background-color: {palette.color(QPalette.ColorRole.Highlight).name()};
-                color: {palette.color(QPalette.ColorRole.HighlightedText).name()};
+                background-color: {hover_bg_final};
+                color: {palette.color(QPalette.ColorRole.Text).name()};
             }}
             QTreeView::item:selected {{
                 background-color: {palette.color(QPalette.ColorRole.Highlight).name()};

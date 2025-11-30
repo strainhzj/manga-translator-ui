@@ -571,7 +571,7 @@ class DBConvNextDetector(OfflineDetector):
             polys = polys.astype(np.int64)
 
         textlines = [Quadrilateral(pts.astype(int), '', score) for pts, score in zip(polys, scores)]
-        textlines = list(filter(lambda q: q.area > 16, textlines))
+        textlines = list(filter(lambda q: q.area > 16, textlines))  # 保留最小面积过滤
         mask_resized = cv2.resize(mask, (mask.shape[1] * 2, mask.shape[0] * 2), interpolation=cv2.INTER_LINEAR)
         if pad_h > 0:
             mask_resized = mask_resized[:-pad_h, :]

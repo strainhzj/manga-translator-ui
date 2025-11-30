@@ -42,30 +42,7 @@ class CommonDetector(InfererModule):
 
         # Run detection
         textlines, raw_mask, mask = await self._detect(image, detect_size, text_threshold, box_threshold, unclip_ratio, verbose)
-        # 应用面积过滤：固定阈值 + 相对图片总像素的比例阈值
-        img_total_pixels = img_h * img_w  # 使用原始图片尺寸
-        before_filter_count = len(textlines)
-        
-        # 记录被过滤掉的框
-        filtered_out = []
-        filtered_in = []
-        for x in textlines:
-            area_ratio = x.area / img_total_pixels
-            if x.area <= 16 or area_ratio <= min_box_area_ratio:
-                filtered_out.append((x, area_ratio))
-            else:
-                filtered_in.append(x)
-        
-        textlines = filtered_in
-        after_filter_count = len(textlines)
-        
-        if filtered_out:
-            self.logger.info(f'面积过滤: 图片{img_w}x{img_h} ({img_total_pixels}像素), 最小面积比例={min_box_area_ratio:.4f} ({min_box_area_ratio*100:.2f}%), '
-                            f'过滤前={before_filter_count}, 过滤后={after_filter_count}, 移除={len(filtered_out)}')
-            for idx, (x, ratio) in enumerate(filtered_out[:5]):  # 只打印前5个
-                self.logger.debug(f'  移除框[{idx+1}]: 面积={x.area:.1f}像素, 占比={ratio*100:.3f}%, 得分={x.prob:.3f}')
-            if len(filtered_out) > 5:
-                self.logger.debug(f'  ... 还有 {len(filtered_out)-5} 个被过滤的框未显示')
+        # 面积过滤已移至文本行合并后进行（基于合并后的大框）
 
         # Remove filters
         if add_border:

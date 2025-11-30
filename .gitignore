@@ -189,3 +189,7 @@ resources (1)/
 
 # Original images (测试/工作目录)
 originals/
+
+# Manga chapter splitter tool (漫画章节分割工具 - 独立工具)
+desktop_qt_ui/manga_chapter_splitter/
+启动章节分割工具.bat

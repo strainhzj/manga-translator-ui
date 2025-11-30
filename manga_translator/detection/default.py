@@ -137,7 +137,7 @@ class DefaultDetector(OfflineDetector):
                         
                         # 创建Quadrilateral并检查面积
                         quad = Quadrilateral(box_points, '', region_score)
-                        # 应用和最终结果相同的面积过滤（area > 16）
+                        # 保留最小面积过滤（area > 16）
                         if quad.area > 16:
                             all_textlines.append(quad)
                             all_scores.append(region_score)

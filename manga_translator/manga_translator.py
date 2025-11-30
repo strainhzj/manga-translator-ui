@@ -1258,6 +1258,68 @@ class MangaTranslator:
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],  
                                                      config, verbose=self.verbose)  
 
+        # 应用合并后的面积过滤（基于合并后的大框）
+        # 只过滤单个检测框的小区域，保留包含多个检测框的合并区域
+        if config.detector.min_box_area_ratio > 0:
+            img_h, img_w = ctx.img_rgb.shape[:2]
+            img_total_pixels = img_h * img_w
+            
+            # 模拟检测器的切割逻辑，判断是否需要切割
+            h, w = img_h, img_w
+            transpose = False
+            if h < w:
+                transpose = True
+                h, w = w, h
+            
+            asp_ratio = h / w
+            tgt_size = config.detector.detect_size
+            down_scale_ratio = h / tgt_size
+            require_rearrange = down_scale_ratio > 2.5 and asp_ratio > 3
+            
+            # 如果需要切割，计算切割块的大小
+            if require_rearrange:
+                pw_num = max(int(np.floor(2 * tgt_size / w)), 2)
+                patch_size = ph = pw_num * w
+                tile_pixels = patch_size * w  # 每个切割块的像素数
+                logger.info(f'检测到极端长宽比图片 (长宽比={asp_ratio:.2f}), 使用切割块面积 ({patch_size}x{w}={tile_pixels}像素) 进行过滤')
+            else:
+                tile_pixels = img_total_pixels  # 不切割，使用整图
+            
+            before_filter_count = len(text_regions)
+            filtered_out_regions = []
+            filtered_in_regions = []
+            
+            for region in text_regions:
+                # 计算合并的检测框数量
+                num_textlines = len(region.lines)
+                
+                # 如果包含多个检测框，说明是真正的文本区域，保留
+                if num_textlines > 1:
+                    filtered_in_regions.append(region)
+                    continue
+                
+                # 只对单个检测框的区域进行面积过滤
+                region_area = region.real_area
+                # 使用切割块面积（如果有切割）或整图面积
+                area_ratio = region_area / tile_pixels
+                
+                if region_area <= 16 or area_ratio <= config.detector.min_box_area_ratio:
+                    filtered_out_regions.append((region, area_ratio, num_textlines, require_rearrange))
+                else:
+                    filtered_in_regions.append(region)
+            
+            text_regions = filtered_in_regions
+            after_filter_count = len(text_regions)
+            
+            if filtered_out_regions:
+                reference_desc = f'切割块({patch_size}x{w})' if require_rearrange else f'整图({img_w}x{img_h})'
+                logger.info(f'合并后面积过滤: 参考={reference_desc}, 最小面积比例={config.detector.min_box_area_ratio:.4f} ({config.detector.min_box_area_ratio*100:.2f}%), '
+                           f'过滤前={before_filter_count}, 过滤后={after_filter_count}, 移除={len(filtered_out_regions)} (仅单框区域)')
+                for idx, (region, ratio, num_lines, was_rearranged) in enumerate(filtered_out_regions[:5]):
+                    logger.debug(f'  移除单框区域[{idx+1}]: 面积={region.real_area:.1f}像素, 占比={ratio*100:.3f}%, 文本行数={num_lines}, 文本="{region.text[:20]}"')
+                if len(filtered_out_regions) > 5:
+                    logger.debug(f'  ... 还有 {len(filtered_out_regions)-5} 个被过滤的单框区域未显示')
+
         new_text_regions = []
         for region in text_regions:
             # Remove leading spaces after pre-translation dictionary replacement                
@@ -1582,14 +1644,15 @@ class MangaTranslator:
         # --- NEW: Generate and Export Workflow ---
         if self.generate_and_export:
             logger.info("'Generate and Export' mode: Halting pipeline after translation and exporting clean text.")
-            if hasattr(ctx, 'image_name') and ctx.image_name and ctx.text_regions:
+            # 即使没有文本也要导出（创建空文件）
+            if hasattr(ctx, 'image_name') and ctx.image_name:
                 try:
                     json_path = find_json_path(ctx.image_name)
                     if json_path and os.path.exists(json_path):
                         from desktop_qt_ui.services.workflow_service import generate_translated_text, get_template_path_from_config
                         template_path = get_template_path_from_config()
                         if template_path and os.path.exists(template_path):
-                            # 导出翻译
+                            # 导出翻译（即使没有文本也会创建空文件）
                             translated_result = generate_translated_text(json_path, template_path)
                             logger.info(f"Translated text export result: {translated_result}")
                         else:
@@ -2174,6 +2237,12 @@ class MangaTranslator:
                     if should_skip:
                         logger.info(f"⏭️  Skipping {skip_reason}")
                         skipped_count += 1
+                        # 立即释放图片内存
+                        if hasattr(image, 'close'):
+                            try:
+                                image.close()
+                            except:
+                                pass
                         # 创建一个已跳过的上下文
                         ctx = Context()
                         ctx.image_name = image_name
@@ -2189,6 +2258,12 @@ class MangaTranslator:
             
             images_with_configs = filtered_images
             total_images = len(images_with_configs)
+            
+            # 强制垃圾回收，立即释放被跳过的图片内存
+            if skipped_count > 0:
+                import gc
+                gc.collect()
+                logger.debug(f"🧹 Garbage collection completed after skipping {skipped_count} files")
             
             # 如果所有文件都已存在，直接返回
             if total_images == 0:
@@ -3847,6 +3922,12 @@ class MangaTranslator:
                     if should_skip:
                         logger.info(f"⏭️  Skipping {skip_reason}")
                         skipped_count += 1
+                        # 立即释放图片内存
+                        if hasattr(image, 'close'):
+                            try:
+                                image.close()
+                            except:
+                                pass
                         # 创建一个已跳过的上下文
                         ctx = Context()
                         ctx.image_name = image_name
@@ -3861,6 +3942,12 @@ class MangaTranslator:
                 logger.info(f"📊 Skipped {skipped_count} existing files, processing {len(filtered_images)} remaining files")
             
             images_with_configs = filtered_images
+            
+            # 强制垃圾回收，立即释放被跳过的图片内存
+            if skipped_count > 0:
+                import gc
+                gc.collect()
+                logger.debug(f"🧹 Garbage collection completed after skipping {skipped_count} files")
             
             # 如果所有文件都已存在，直接返回
             if len(images_with_configs) == 0:

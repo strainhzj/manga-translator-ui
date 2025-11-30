@@ -294,6 +294,10 @@ def generate_original_text(
                 'original': original_text,
                 'translated': translated_text if translated_text else original_text  # 如果translation为空，使用原文作为占位符
             })
+    
+    # 记录是否有文本
+    if not items:
+        logger.info(f"No text regions found in {detailed_json_path}, will create empty TXT file")
 
     # 生成输出路径
     if output_path is None:
@@ -322,7 +326,10 @@ def generate_original_text(
 
     # 使用模板格式化输出
     try:
-        if template_path and os.path.exists(template_path):
+        # 如果没有文本，创建空文件
+        if not items:
+            output_content = ""
+        elif template_path and os.path.exists(template_path):
             with open(template_path, 'r', encoding='utf-8') as f:
                 template_string = f.read()
             prefix, item_template, separator, suffix = parse_template(template_string)
@@ -418,7 +425,10 @@ def generate_translated_text(
 
     # 使用模板格式化输出
     try:
-        if template_path and os.path.exists(template_path):
+        # 如果没有文本，创建空文件
+        if not items:
+            output_content = ""
+        elif template_path and os.path.exists(template_path):
             with open(template_path, 'r', encoding='utf-8') as f:
                 template_string = f.read()
             prefix, item_template, separator, suffix = parse_template(template_string)
