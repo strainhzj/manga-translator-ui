@@ -358,6 +358,36 @@ python -m manga_translator web --models-ttl 300
 python -m manga_translator web --retry-attempts 3
 ```
 
+### 环境变量配置
+
+**管理员密码自动设置**
+
+首次启动 Web 服务器时，可以通过环境变量自动设置管理员密码，无需手动在界面中设置：
+
+```bash
+# Windows (CMD)
+set MANGA_TRANSLATOR_ADMIN_PASSWORD=your_password_here
+python -m manga_translator web --host 127.0.0.1 --port 8000
+
+# Windows (PowerShell)
+$env:MANGA_TRANSLATOR_ADMIN_PASSWORD="your_password_here"
+python -m manga_translator web --host 127.0.0.1 --port 8000
+
+# Linux / macOS
+export MANGA_TRANSLATOR_ADMIN_PASSWORD=your_password_here
+python -m manga_translator web --host 127.0.0.1 --port 8000
+
+# Docker 部署
+docker run -e MANGA_TRANSLATOR_ADMIN_PASSWORD=your_password_here ...
+```
+
+**说明**：
+- 密码至少需要 6 位字符
+- 只在首次启动且未设置密码时生效
+- 密码会自动保存到 `manga_translator/server/admin_config.json`
+- 后续启动会使用保存的密码，不再读取环境变量
+- 如需修改密码，请在管理面板中使用"更改管理员密码"功能
+
 **核心功能**：
 
 **1. Web用户界面**

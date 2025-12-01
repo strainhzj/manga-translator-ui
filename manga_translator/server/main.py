@@ -142,13 +142,37 @@ def load_admin_settings():
                 # 合并默认配置和加载的配置
                 settings = DEFAULT_ADMIN_SETTINGS.copy()
                 settings.update(loaded_settings)
+                
+                # 如果配置文件中没有密码，尝试从环境变量读取
+                if not settings.get('admin_password'):
+                    env_password = os.environ.get('MANGA_TRANSLATOR_ADMIN_PASSWORD')
+                    if env_password and len(env_password) >= 6:
+                        settings['admin_password'] = env_password
+                        # 保存到配置文件
+                        save_admin_settings(settings)
+                        print(f"[INFO] Admin password set from environment variable MANGA_TRANSLATOR_ADMIN_PASSWORD")
+                    elif env_password:
+                        print(f"[WARNING] MANGA_TRANSLATOR_ADMIN_PASSWORD is too short (minimum 6 characters)")
+                
                 return settings
         except Exception as e:
             print(f"[ERROR] Failed to load admin settings: {e}")
             return DEFAULT_ADMIN_SETTINGS.copy()
     else:
         print(f"[INFO] Admin config file not found, using defaults: {ADMIN_CONFIG_PATH}")
-        return DEFAULT_ADMIN_SETTINGS.copy()
+        settings = DEFAULT_ADMIN_SETTINGS.copy()
+        
+        # 首次启动时，尝试从环境变量读取密码
+        env_password = os.environ.get('MANGA_TRANSLATOR_ADMIN_PASSWORD')
+        if env_password and len(env_password) >= 6:
+            settings['admin_password'] = env_password
+            # 保存到配置文件
+            save_admin_settings(settings)
+            print(f"[INFO] Admin password set from environment variable MANGA_TRANSLATOR_ADMIN_PASSWORD")
+        elif env_password:
+            print(f"[WARNING] MANGA_TRANSLATOR_ADMIN_PASSWORD is too short (minimum 6 characters)")
+        
+        return settings
 
 def save_admin_settings(settings):
     """保存管理员配置到文件"""

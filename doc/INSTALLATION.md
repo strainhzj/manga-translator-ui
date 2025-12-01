@@ -281,6 +281,13 @@ Docker部署支持通过环境变量配置服务器参数：
 | `MT_MODELS_TTL` | 模型存活时间（秒） | `0`（永久） | `300` |
 | `MT_RETRY_ATTEMPTS` | 翻译重试次数 | `-1`（无限） | `3` |
 | `MT_VERBOSE` | 详细日志 | `false` | `true` |
+| `MANGA_TRANSLATOR_ADMIN_PASSWORD` | 管理员密码（首次启动自动设置） | 无 | `your_password` |
+
+**管理员密码说明**：
+- 首次启动时，如果设置了 `MANGA_TRANSLATOR_ADMIN_PASSWORD` 环境变量，会自动设置为管理员密码
+- 密码至少需要 6 位字符
+- 密码会保存到 `admin_config.json`，后续启动不再读取环境变量
+- 如需修改密码，请在管理面板中使用"更改管理员密码"功能
 
 ### 方式1：使用Docker命令
 
@@ -290,12 +297,13 @@ Docker部署支持通过环境变量配置服务器参数：
 # 拉取镜像
 docker pull your-registry/manga-translator:latest
 
-# 运行容器
+# 运行容器（带管理员密码）
 docker run -d \
   --name manga-translator \
   -p 8000:8000 \
   -e MT_WEB_HOST=0.0.0.0 \
   -e MT_WEB_PORT=8000 \
+  -e MANGA_TRANSLATOR_ADMIN_PASSWORD=your_secure_password \
   -v $(pwd)/fonts:/app/fonts \
   -v $(pwd)/dict:/app/dict \
   -v $(pwd)/result:/app/result \
@@ -308,7 +316,7 @@ docker run -d \
 # 拉取GPU镜像
 docker pull your-registry/manga-translator:latest-gpu
 
-# 运行GPU容器
+# 运行GPU容器（带管理员密码）
 docker run -d \
   --name manga-translator-gpu \
   --gpus all \
@@ -317,6 +325,7 @@ docker run -d \
   -e MT_WEB_PORT=8000 \
   -e MT_USE_GPU=true \
   -e MT_MODELS_TTL=300 \
+  -e MANGA_TRANSLATOR_ADMIN_PASSWORD=your_secure_password \
   -v $(pwd)/fonts:/app/fonts \
   -v $(pwd)/dict:/app/dict \
   -v $(pwd)/result:/app/result \
