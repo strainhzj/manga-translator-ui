@@ -14,6 +14,7 @@ class EditorLogic(QObject):
     Handles the business logic for the editor view, including file list management.
     """
     file_list_changed = pyqtSignal(list)
+    file_list_with_tree_changed = pyqtSignal(list, dict)  # (files, folder_map)
 
     def __init__(self, controller, parent=None):
         super().__init__(parent)
@@ -77,16 +78,27 @@ class EditorLogic(QObject):
         if not folder_path or not os.path.isdir(folder_path):
             return
         
-        image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp'}
-        try:
-            files_in_folder = [
-                os.path.join(folder_path, f) 
-                for f in os.listdir(folder_path) 
-                if os.path.splitext(f)[1].lower() in image_extensions
-            ]
-            self.add_files(files_in_folder)
-        except OSError as e:
-            print(f"Error reading folder {folder_path}: {e}")
+        # 检查是否是第一次添加文件（列表为空）
+        is_first_add = len(self.source_files) == 0
+        
+        # 添加文件夹路径到source_files，让FileListView创建树形结构
+        if folder_path not in self.source_files:
+            self.source_files.append(folder_path)
+            self.file_list_changed.emit(self.source_files)
+            
+            # 如果是第一次添加，自动加载第一个图片
+            if is_first_add:
+                # 获取文件夹中的第一个图片
+                image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp'}
+                try:
+                    for root, dirs, files in os.walk(folder_path):
+                        for f in sorted(files):
+                            if os.path.splitext(f)[1].lower() in image_extensions:
+                                first_image = os.path.join(root, f)
+                                self.load_image_into_editor(first_image)
+                                return
+                except OSError as e:
+                    print(f"Error reading folder {folder_path}: {e}")
 
     @pyqtSlot(list)
     def add_files_from_paths(self, paths: List[str]):
@@ -192,41 +204,32 @@ class EditorLogic(QObject):
     def load_file_lists(self, source_files: List[str], translated_files: List[str], folder_map: dict = None):
         """
         Receives the file lists from the coordinator to populate the editor.
-        folder_map: 文件到文件夹的映射，用于支持文件夹分组显示
+        folder_map: 文件到文件夹的映射，用于支持文件夹分组显示（key是源文件路径）
         """
+        print(f"[DEBUG editor_logic] load_file_lists called")
+        print(f"[DEBUG editor_logic] source_files: {source_files}")
+        print(f"[DEBUG editor_logic] translated_files: {translated_files}")
+        print(f"[DEBUG editor_logic] folder_map: {folder_map}")
+        
         self.source_files = source_files
         self.translated_files = translated_files
         self.translation_map_cache.clear() # Clear cache when lists change
         
-        # 如果提供了folder_map，将文件按文件夹分组
-        files_to_show = self.translated_files if self.translated_files else self.source_files
+        # 选择要显示的文件列表
+        # 如果有翻译后的文件，显示源文件列表（但实际加载翻译后的文件）
+        # 这样文件夹结构和主页视图保持一致
+        files_to_show = self.source_files
         
+        print(f"[DEBUG editor_logic] files_to_show: {files_to_show}")
+        print(f"[DEBUG editor_logic] Has folder_map: {bool(folder_map)}")
+        
+        # 如果有folder_map，使用树形结构显示
         if folder_map:
-            # 按文件夹分组
-            folder_groups = {}
-            single_files = []
-            
-            for file_path in files_to_show:
-                folder = folder_map.get(file_path)
-                if folder:
-                    if folder not in folder_groups:
-                        folder_groups[folder] = []
-                    folder_groups[folder].append(file_path)
-                else:
-                    single_files.append(file_path)
-            
-            # 构建文件列表：按文件夹分组，但只添加文件，不添加文件夹路径
-            # 这样可以保持文件夹分组的顺序，但不会让FileListView重新展开文件夹
-            grouped_list = []
-            for folder, files in sorted(folder_groups.items()):
-                # 只添加文件，不添加文件夹路径
-                # 文件会按文件夹分组显示，但不会重新展开文件夹
-                grouped_list.extend(files)
-            grouped_list.extend(single_files)  # 添加单独的文件
-            
-            self.file_list_changed.emit(grouped_list)
+            print(f"[DEBUG editor_logic] Emitting file_list_with_tree_changed signal")
+            self.file_list_with_tree_changed.emit(files_to_show, folder_map)
         else:
-            # 发射翻译后的文件列表，而不是源文件列表
+            # 否则使用平铺列表
+            print(f"[DEBUG editor_logic] Emitting file_list_changed signal")
             self.file_list_changed.emit(files_to_show)
 
     @pyqtSlot(str)
