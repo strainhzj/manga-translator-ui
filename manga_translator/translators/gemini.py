@@ -226,9 +226,9 @@ This is an incorrect response because it includes extra text and explanations.
         final_prompt += base_prompt
         return final_prompt
 
-    def _build_user_prompt(self, texts: List[str], ctx: Any) -> str:
+    def _build_user_prompt(self, texts: List[str], ctx: Any, retry_attempt: int = 0, retry_reason: str = "") -> str:
         """构建用户提示词（纯文本版）- 使用统一方法，只包含上下文和待翻译文本"""
-        return self._build_user_prompt_for_texts(texts, ctx, self.prev_context)
+        return self._build_user_prompt_for_texts(texts, ctx, self.prev_context, retry_attempt=retry_attempt, retry_reason=retry_reason)
     
     def _get_system_instruction(self, source_lang: str, target_lang: str, custom_prompt_json: Dict[str, Any] = None, line_break_prompt_json: Dict[str, Any] = None) -> str:
         """获取完整的系统指令（包含断句提示词、自定义提示词和基础系统提示词）"""
@@ -257,20 +257,15 @@ This is an incorrect response because it includes extra text and explanations.
             self.logger.error("Gemini客户端初始化失败")
             return texts
         
-        # 构建用户提示词（只包含上下文和待翻译文本，不包含系统指令）
-        user_prompt = self._build_user_prompt(texts, ctx)
+        # 初始化重试信息
+        retry_attempt = 0
+        retry_reason = ""
         
         # 发送请求
         max_retries = self.attempts
         attempt = 0
         is_infinite = max_retries == -1
         local_attempt = 0  # 本次批次的尝试次数
-
-        # 动态构建请求参数 - 默认总是发送安全设置
-        request_args = {
-            "contents": user_prompt,
-            "safety_settings": self.safety_settings
-        }
         
         # 标记是否需要回退（不发送安全设置）
         should_retry_without_safety = False
@@ -294,6 +289,15 @@ This is an incorrect response because it includes extra text and explanations.
             if local_attempt > self._SPLIT_THRESHOLD and len(texts) > 1 and split_level < self._MAX_SPLIT_ATTEMPTS:
                 self.logger.warning(f"Triggering split after {local_attempt} local attempts")
                 raise self.SplitException(local_attempt, texts)
+            
+            # 构建用户提示词（包含重试信息以避免缓存）
+            user_prompt = self._build_user_prompt(texts, ctx, retry_attempt=retry_attempt, retry_reason=retry_reason)
+            
+            # 动态构建请求参数 - 默认总是发送安全设置
+            request_args = {
+                "contents": user_prompt,
+                "safety_settings": self.safety_settings
+            }
 
             try:
                 # RPM限制
@@ -371,9 +375,10 @@ This is an incorrect response because it includes extra text and explanations.
                 
                 # Strict validation: must match input count
                 if len(translations) != len(texts):
-                    attempt += 1
+                    retry_attempt += 1
+                    retry_reason = f"Translation count mismatch: expected {len(texts)}, got {len(translations)}"
                     log_attempt = f"{attempt}/{max_retries}" if not is_infinite else f"Attempt {attempt}"
-                    self.logger.warning(f"[{log_attempt}] Translation count mismatch: expected {len(texts)}, got {len(translations)}. Retrying...")
+                    self.logger.warning(f"[{log_attempt}] {retry_reason}. Retrying...")
                     self.logger.warning(f"Expected texts: {texts}")
                     self.logger.warning(f"Got translations: {translations}")
                     
@@ -386,9 +391,10 @@ This is an incorrect response because it includes extra text and explanations.
                 # 质量验证：检查空翻译、合并翻译、可疑符号等
                 is_valid, error_msg = self._validate_translation_quality(texts, translations)
                 if not is_valid:
-                    attempt += 1
+                    retry_attempt += 1
+                    retry_reason = f"Quality check failed: {error_msg}"
                     log_attempt = f"{attempt}/{max_retries}" if not is_infinite else f"Attempt {attempt}"
-                    self.logger.warning(f"[{log_attempt}] Quality check failed: {error_msg}. Retrying...")
+                    self.logger.warning(f"[{log_attempt}] {retry_reason}. Retrying...")
 
                     if not is_infinite and attempt >= max_retries:
                         raise Exception(f"Quality check failed after {max_retries} attempts: {error_msg}")
@@ -404,9 +410,10 @@ This is an incorrect response because it includes extra text and explanations.
 
                 # BR检查：检查翻译结果是否包含必要的[BR]标记
                 if not self._validate_br_markers(translations, queries=texts, ctx=ctx):
-                    attempt += 1
+                    retry_attempt += 1
+                    retry_reason = "BR markers missing in translations"
                     log_attempt = f"{attempt}/{max_retries}" if not is_infinite else f"Attempt {attempt}"
-                    self.logger.warning(f"[{log_attempt}] BR markers missing, retrying...")
+                    self.logger.warning(f"[{log_attempt}] {retry_reason}, retrying...")
                     
                     # 如果达到最大重试次数，抛出友好的异常
                     if not is_infinite and attempt >= max_retries:

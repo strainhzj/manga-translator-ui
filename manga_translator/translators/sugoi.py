@@ -1,10 +1,21 @@
-import ctranslate2
-import sentencepiece as spm
 from typing import List
 import re
 
 from .common import OfflineTranslator
 from ..utils import chunks
+
+# 延迟导入 ctranslate2 和 sentencepiece，避免在不使用时加载
+ctranslate2 = None
+spm = None
+
+def _lazy_import():
+    """延迟导入 ctranslate2 和 sentencepiece"""
+    global ctranslate2, spm
+    if ctranslate2 is None:
+        import ctranslate2 as ct2
+        import sentencepiece as sp
+        ctranslate2 = ct2
+        spm = sp
 
 class JparacrawlTranslator(OfflineTranslator):
     _LANGUAGE_CODE_MAP = {
@@ -57,6 +68,9 @@ class JparacrawlTranslator(OfflineTranslator):
     #     subprocess.check_call(cmds)
 
     async def _load(self, from_lang: str, to_lang: str, device: str):
+        # 在实际使用时才导入依赖
+        _lazy_import()
+        
         if from_lang == 'auto':
             if to_lang == 'en':
                 from_lang = 'ja'

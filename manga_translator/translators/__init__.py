@@ -11,7 +11,8 @@ from .papago import PapagoTranslator
 from .caiyun import CaiyunTranslator
 from .openai import OpenAITranslator
 from .nllb import NLLBTranslator, NLLBBigTranslator
-from .sugoi import JparacrawlTranslator, JparacrawlBigTranslator, SugoiTranslator
+# 延迟导入 sugoi 翻译器，避免在启动时加载 ctranslate2
+# from .sugoi import JparacrawlTranslator, JparacrawlBigTranslator, SugoiTranslator
 from .m2m100 import M2M100Translator, M2M100BigTranslator
 from .mbart50 import MBart50Translator
 from .selective import SelectiveOfflineTranslator, prepare as prepare_selective_translator
@@ -26,13 +27,49 @@ from .gemini_hq import GeminiHighQualityTranslator
 from ..config import Config, Translator, TranslatorConfig, TranslatorChain
 from ..utils import Context
 
+# 延迟导入函数
+def _get_sugoi_translators():
+    """延迟导入 Sugoi 相关翻译器"""
+    from .sugoi import JparacrawlTranslator, JparacrawlBigTranslator, SugoiTranslator
+    return JparacrawlTranslator, JparacrawlBigTranslator, SugoiTranslator
+
+# 使用懒加载的占位符
+_sugoi_translators_loaded = False
+_JparacrawlTranslator = None
+_JparacrawlBigTranslator = None
+_SugoiTranslator = None
+
+def _ensure_sugoi_loaded():
+    """确保 Sugoi 翻译器已加载"""
+    global _sugoi_translators_loaded, _JparacrawlTranslator, _JparacrawlBigTranslator, _SugoiTranslator
+    if not _sugoi_translators_loaded:
+        _JparacrawlTranslator, _JparacrawlBigTranslator, _SugoiTranslator = _get_sugoi_translators()
+        _sugoi_translators_loaded = True
+
+class _LazyTranslatorProxy:
+    """延迟加载翻译器的代理类"""
+    def __init__(self, translator_name):
+        self.translator_name = translator_name
+        self._translator_class = None
+    
+    def __call__(self, *args, **kwargs):
+        if self._translator_class is None:
+            _ensure_sugoi_loaded()
+            if self.translator_name == 'sugoi':
+                self._translator_class = _SugoiTranslator
+            elif self.translator_name == 'jparacrawl':
+                self._translator_class = _JparacrawlTranslator
+            elif self.translator_name == 'jparacrawl_big':
+                self._translator_class = _JparacrawlBigTranslator
+        return self._translator_class(*args, **kwargs)
+
 OFFLINE_TRANSLATORS = {
     Translator.offline: SelectiveOfflineTranslator,
     Translator.nllb: NLLBTranslator,
     Translator.nllb_big: NLLBBigTranslator,
-    Translator.sugoi: SugoiTranslator,
-    Translator.jparacrawl: JparacrawlTranslator,
-    Translator.jparacrawl_big: JparacrawlBigTranslator,
+    Translator.sugoi: _LazyTranslatorProxy('sugoi'),
+    Translator.jparacrawl: _LazyTranslatorProxy('jparacrawl'),
+    Translator.jparacrawl_big: _LazyTranslatorProxy('jparacrawl_big'),
     Translator.m2m100: M2M100Translator,
     Translator.m2m100_big: M2M100BigTranslator,
     Translator.mbart50: MBart50Translator,

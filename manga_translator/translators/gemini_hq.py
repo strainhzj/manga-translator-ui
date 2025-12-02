@@ -223,9 +223,9 @@ class GeminiHighQualityTranslator(CommonTranslator):
         final_prompt += base_prompt
         return final_prompt
 
-    def _build_user_prompt(self, batch_data: List[Dict], ctx: Any) -> str:
+    def _build_user_prompt(self, batch_data: List[Dict], ctx: Any, retry_attempt: int = 0, retry_reason: str = "") -> str:
         """构建用户提示词（高质量版）- 使用统一方法，只包含上下文和待翻译文本"""
-        return self._build_user_prompt_for_hq(batch_data, ctx, self.prev_context)
+        return self._build_user_prompt_for_hq(batch_data, ctx, self.prev_context, retry_attempt=retry_attempt, retry_reason=retry_reason)
     
     def _get_system_instruction(self, source_lang: str, target_lang: str, custom_prompt_json: Dict[str, Any] = None, line_break_prompt_json: Dict[str, Any] = None) -> str:
         """获取完整的系统指令（包含断句提示词、自定义提示词和基础系统提示词）"""
@@ -248,9 +248,6 @@ class GeminiHighQualityTranslator(CommonTranslator):
             self.logger.error("Gemini客户端初始化失败")
             return texts
         
-        # 准备内容：user消息只包含上下文、待翻译文本和图片
-        content_parts = []
-        
         # 打印输入的原文
         self.logger.info("--- Original Texts for Translation ---")
         for i, text in enumerate(texts):
@@ -264,27 +261,22 @@ class GeminiHighQualityTranslator(CommonTranslator):
             self.logger.info(f"Image {i+1}: size={image.size}, mode={image.mode}")
         self.logger.info("--------------------")
 
-        # 构建用户提示词（只包含上下文和待翻译文本，不包含系统指令）
-        user_prompt = self._build_user_prompt(batch_data, ctx)
-        content_parts.append(user_prompt)
-        
-        # 添加图片（放在最后）
+        # 准备图片列表（放在最后）
+        image_parts = []
         for data in batch_data:
             image = data['image']
             processed_image = encode_image_for_gemini(image)
-            content_parts.append(processed_image)
+            image_parts.append(processed_image)
+        
+        # 初始化重试信息
+        retry_attempt = 0
+        retry_reason = ""
         
         # 发送请求
         max_retries = self.attempts
         attempt = 0
         is_infinite = max_retries == -1
         local_attempt = 0  # 本次批次的尝试次数
-
-        # 动态构建请求参数 - 默认总是发送安全设置
-        request_args = {
-            "contents": content_parts,
-            "safety_settings": self.safety_settings
-        }
         
         # 标记是否需要回退（不发送安全设置）
         should_retry_without_safety = False
@@ -320,6 +312,18 @@ class GeminiHighQualityTranslator(CommonTranslator):
             if local_attempt > self._SPLIT_THRESHOLD and len(texts) > 1 and split_level < self._MAX_SPLIT_ATTEMPTS:
                 self.logger.warning(f"Triggering split after {local_attempt} local attempts")
                 raise self.SplitException(local_attempt, texts)
+            
+            # 构建用户提示词（包含重试信息以避免缓存）
+            user_prompt = self._build_user_prompt(batch_data, ctx, retry_attempt=retry_attempt, retry_reason=retry_reason)
+            
+            # 准备内容：user消息只包含上下文、待翻译文本和图片
+            content_parts = [user_prompt] + image_parts
+            
+            # 动态构建请求参数 - 默认总是发送安全设置
+            request_args = {
+                "contents": content_parts,
+                "safety_settings": self.safety_settings
+            }
 
             try:
                 # RPM限制
@@ -398,9 +402,10 @@ class GeminiHighQualityTranslator(CommonTranslator):
                 
                 # Strict validation: must match input count
                 if len(translations) != len(texts):
-                    attempt += 1
+                    retry_attempt += 1
+                    retry_reason = f"Translation count mismatch: expected {len(texts)}, got {len(translations)}"
                     log_attempt = f"{attempt}/{max_retries}" if not is_infinite else f"Attempt {attempt}"
-                    self.logger.warning(f"[{log_attempt}] Translation count mismatch: expected {len(texts)}, got {len(translations)}. Retrying...")
+                    self.logger.warning(f"[{log_attempt}] {retry_reason}. Retrying...")
                     self.logger.warning(f"Expected texts: {texts}")
                     self.logger.warning(f"Got translations: {translations}")
 
@@ -413,9 +418,10 @@ class GeminiHighQualityTranslator(CommonTranslator):
                 # 质量验证：检查空翻译、合并翻译、可疑符号等
                 is_valid, error_msg = self._validate_translation_quality(texts, translations)
                 if not is_valid:
-                    attempt += 1
+                    retry_attempt += 1
+                    retry_reason = f"Quality check failed: {error_msg}"
                     log_attempt = f"{attempt}/{max_retries}" if not is_infinite else f"Attempt {attempt}"
-                    self.logger.warning(f"[{log_attempt}] Quality check failed: {error_msg}. Retrying...")
+                    self.logger.warning(f"[{log_attempt}] {retry_reason}. Retrying...")
 
                     if not is_infinite and attempt >= max_retries:
                         raise Exception(f"Quality check failed after {max_retries} attempts: {error_msg}")
@@ -432,9 +438,10 @@ class GeminiHighQualityTranslator(CommonTranslator):
                 # BR检查：检查翻译结果是否包含必要的[BR]标记
                 # BR check: Check if translations contain necessary [BR] markers
                 if not self._validate_br_markers(translations, batch_data=batch_data, ctx=ctx):
-                    attempt += 1
+                    retry_attempt += 1
+                    retry_reason = "BR markers missing in translations"
                     log_attempt = f"{attempt}/{max_retries}" if not is_infinite else f"Attempt {attempt}"
-                    self.logger.warning(f"[{log_attempt}] BR markers missing, retrying...")
+                    self.logger.warning(f"[{log_attempt}] {retry_reason}, retrying...")
                     
                     # 如果达到最大重试次数，抛出友好的异常
                     if not is_infinite and attempt >= max_retries:

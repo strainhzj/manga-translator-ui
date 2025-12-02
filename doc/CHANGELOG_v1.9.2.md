@@ -23,6 +23,19 @@
 
 ## ⚡ 优化
 
+### 翻译器架构改进
+- **系统提示词与用户消息分离**：
+  - OpenAI 和 OpenAI HQ：系统提示词（包括断句提示、自定义提示、基础系统提示）现在放在 `system` role，用户消息只包含上下文、待翻译文本和图片
+  - Gemini 和 Gemini HQ：系统提示词放在 `system_instruction` 参数中，用户消息只包含上下文、待翻译文本和图片
+  - 图片始终放在用户消息的最后
+  - 更符合各 API 的最佳实践，提高翻译质量
+
+- **智能重试机制**：
+  - 新增重试提示功能，避免模型服务器缓存导致的重复错误
+  - 当翻译质量不合格（数量不匹配、质量检查失败、BR 标记缺失）需要重试时，会在用户消息中添加重试次数和失败原因
+  - 例如：`[Retry attempt #2] Reason: Translation count mismatch: expected 10, got 8`
+  - 有效解决某些第三方 API 代理的缓存问题
+
 ### 检测和过滤
 - **优化混合检测替换逻辑**：
   - 改进 YOLO OBB 检测器与主检测器的框合并算法
@@ -76,6 +89,38 @@
 ---
 
 ## 📝 技术细节
+
+### 翻译器消息结构优化
+
+**OpenAI 系列**：
+```python
+messages = [
+    {"role": "system", "content": "断句提示词\n\n自定义提示词\n\n基础系统提示词"},
+    {"role": "user", "content": [文本, 图片...]}  # 图片在最后
+]
+```
+
+**Gemini 系列**：
+```python
+# 初始化时
+GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction="断句提示词\n\n自定义提示词\n\n基础系统提示词"
+)
+
+# 发送时
+contents = [文本, 图片...]  # 图片在最后
+```
+
+**重试提示示例**：
+```
+[Retry attempt #2] Reason: Quality check failed: Empty translation detected
+
+Please translate the following manga text regions:
+1. こんにちは
+2. さようなら
+...
+```
 
 ### 混合检测算法改进
 之前的逻辑只检查 YOLO 框是否完全包含**单个**主检测器框，可能导致以下问题：

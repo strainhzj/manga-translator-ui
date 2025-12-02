@@ -157,7 +157,35 @@ class CommonTranslator(InfererModule):
         if self._cancel_check_callback and self._cancel_check_callback():
             raise asyncio.CancelledError("Translation cancelled by user")
 
-    def _build_user_prompt_for_texts(self, texts: List[str], ctx=None, prev_context: str = "") -> str:
+    def _get_retry_hint(self, attempt: int, reason: str = "") -> str:
+        """
+        生成重试提示信息，用于避免模型服务器缓存导致的重复错误
+        
+        Args:
+            attempt: 当前尝试次数
+            reason: 重试原因（可选）
+            
+        Returns:
+            重试提示字符串
+        """
+        hints = [
+            f"[Retry attempt #{attempt}]",
+            f"[This is attempt #{attempt}, please provide a different response]",
+            f"[Attempt {attempt}: Previous response had issues, please try again]",
+            f"[Retry #{attempt}: Please ensure quality this time]",
+            f"[Attempt {attempt} - Previous attempts failed quality check]"
+        ]
+        
+        # 根据尝试次数选择不同的提示（循环使用）
+        base_hint = hints[(attempt - 1) % len(hints)]
+        
+        # 如果提供了原因，添加到提示中
+        if reason:
+            return f"{base_hint} Reason: {reason}\n\n"
+        else:
+            return f"{base_hint}\n\n"
+    
+    def _build_user_prompt_for_texts(self, texts: List[str], ctx=None, prev_context: str = "", retry_attempt: int = 0, retry_reason: str = "") -> str:
         """
         统一的用户提示词构建方法（纯文本翻译）
         适用于 openai.py 和 gemini.py
@@ -166,6 +194,8 @@ class CommonTranslator(InfererModule):
             texts: 要翻译的文本列表
             ctx: 上下文对象（可选）
             prev_context: 历史上下文（可选）
+            retry_attempt: 重试次数（可选，用于避免缓存）
+            retry_reason: 重试原因（可选）
 
         Returns:
             构建好的用户提示词字符串
@@ -176,6 +206,10 @@ class CommonTranslator(InfererModule):
             enable_ai_break = getattr(ctx.config.render, 'disable_auto_wrap', False)
 
         prompt = ""
+        
+        # 添加重试提示（如果是重试）
+        if retry_attempt > 0:
+            prompt += self._get_retry_hint(retry_attempt, retry_reason)
 
         # 添加多页上下文（如果有）
         if prev_context:
@@ -201,7 +235,7 @@ class CommonTranslator(InfererModule):
 
         return prompt
 
-    def _build_user_prompt_for_hq(self, batch_data: List, ctx=None, prev_context: str = "") -> str:
+    def _build_user_prompt_for_hq(self, batch_data: List, ctx=None, prev_context: str = "", retry_attempt: int = 0, retry_reason: str = "") -> str:
         """
         统一的用户提示词构建方法（高质量多模态翻译）
         适用于 openai_hq.py 和 gemini_hq.py
@@ -210,6 +244,8 @@ class CommonTranslator(InfererModule):
             batch_data: 批次数据列表，包含图片和原文
             ctx: 上下文对象（可选）
             prev_context: 历史上下文（可选）
+            retry_attempt: 重试次数（可选，用于避免缓存）
+            retry_reason: 重试原因（可选）
 
         Returns:
             构建好的用户提示词字符串
@@ -220,6 +256,10 @@ class CommonTranslator(InfererModule):
             enable_ai_break = getattr(ctx.config.render, 'disable_auto_wrap', False)
 
         prompt = ""
+        
+        # 添加重试提示（如果是重试）
+        if retry_attempt > 0:
+            prompt += self._get_retry_hint(retry_attempt, retry_reason)
 
         # 添加多页上下文（如果有）
         if prev_context:
