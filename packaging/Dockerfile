@@ -66,11 +66,12 @@ COPY . /app/
 ARG BUILD_TYPE=cpu
 RUN if [ "$BUILD_TYPE" = "gpu" ]; then \
         # GPU 版本：尝试下载预编译的 pydensecrf，如果失败则从源码编译
-        if wget -q https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.9.2/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl -O /tmp/pydensecrf.whl 2>/dev/null && [ -f /tmp/pydensecrf.whl ]; then \
-            echo "Using precompiled pydensecrf wheel" && \
-            pip install --no-cache-dir /tmp/pydensecrf.whl; \
+        if wget --spider -q https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.9.2/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl 2>/dev/null; then \
+            echo "Downloading precompiled pydensecrf wheel" && \
+            wget -q https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.9.2/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl -O /tmp/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl && \
+            pip install --no-cache-dir /tmp/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl; \
         else \
-            echo "Precompiled wheel not found, building from source" && \
+            echo "Precompiled wheel not available, building from source" && \
             pip install --no-cache-dir Cython numpy && \
             pip install --no-cache-dir git+https://github.com/lucasb-eyer/pydensecrf.git; \
         fi && \
@@ -78,11 +79,12 @@ RUN if [ "$BUILD_TYPE" = "gpu" ]; then \
         pip install --no-cache-dir -r /tmp/requirements_gpu_no_pydensecrf.txt; \
     else \
         # CPU 版本：尝试下载预编译的 pydensecrf，如果失败则从源码编译
-        if wget -q https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.9.2/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl -O /tmp/pydensecrf.whl 2>/dev/null && [ -f /tmp/pydensecrf.whl ]; then \
-            echo "Using precompiled pydensecrf wheel" && \
-            pip install --no-cache-dir /tmp/pydensecrf.whl; \
+        if wget --spider -q https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.9.2/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl 2>/dev/null; then \
+            echo "Downloading precompiled pydensecrf wheel" && \
+            wget -q https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.9.2/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl -O /tmp/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl && \
+            pip install --no-cache-dir /tmp/pydensecrf-1.0-cp312-cp312-linux_x86_64.whl; \
         else \
-            echo "Precompiled wheel not found, building from source" && \
+            echo "Precompiled wheel not available, building from source" && \
             pip install --no-cache-dir Cython numpy && \
             pip install --no-cache-dir git+https://github.com/lucasb-eyer/pydensecrf.git; \
         fi && \
