@@ -43,7 +43,7 @@
     "yolo_obb_conf": 0.4,
     "yolo_obb_iou": 0.6,
     "yolo_obb_overlap_threshold": 0.1,
-    "min_box_area_ratio": 0.009
+    "min_box_area_ratio": 0
   },
   "inpainter": {
     "inpainter": "lama_large",

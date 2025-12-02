@@ -193,6 +193,11 @@ class ConfigService(QObject):
                 # 获取当前配置
                 config_dict = self.current_config.dict()
                 
+                # 强制设置 min_box_area_ratio 为 0（模板配置固定值）
+                if 'detector' not in config_dict:
+                    config_dict['detector'] = {}
+                config_dict['detector']['min_box_area_ratio'] = 0
+                
                 # 读取现有配置，保留favorite_folders
                 existing_favorites = None
                 if os.path.exists(save_path):
