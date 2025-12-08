@@ -24,7 +24,7 @@ dist/
 *.egg-info/
 
 # Models directory (large binary files - use git-lfs or separate download)
-models/
+/models/
 
 # Output directories
 result/
