@@ -2077,85 +2077,115 @@ class TranslationWorker(QObject):
                 
                 # TXT导入JSON的预处理已经统一到翻译器入口（manga_translator.py），这里不再需要
 
+            # 检查是否启用并发模式
+            batch_concurrent = self.config_dict.get('cli', {}).get('batch_concurrent', False)
+            
             if is_hq or (len(self.files) > 1 and batch_size > 1):
                 self.log_received.emit(f"--- 开始批量处理 ({'高质量模式' if is_hq else '批量模式'})")
 
                 # 输出批量处理信息
                 total_images = len(self.files)
-                # 前端分批加载的批次大小（用于内存管理）
-                frontend_batch_size = 10  # 每次最多加载10张图片到内存
-                total_frontend_batches = (total_images + frontend_batch_size - 1) // frontend_batch_size
                 
-                # 计算后端总批次数（用于显示统一的进度）
-                backend_total_batches = (total_images + batch_size - 1) // batch_size if batch_size > 0 else total_images
-                
-                self.log_received.emit(self._t("📊 Batch processing mode: {total} images in {batches} batches", total=total_images, batches=backend_total_batches))
-                self.log_received.emit(self._t("🔧 Translation workflow: {mode}", mode=workflow_mode))
-                self.log_received.emit(self._t("📁 Output directory: {dir}", dir=self.output_folder))
-                if workflow_tip:
-                    self.log_received.emit(workflow_tip)
+                # 如果启用并发模式，不分批加载（并发流水线内部会按需加载）
+                if batch_concurrent:
+                    self.log_received.emit(self._t("📊 Concurrent pipeline mode: {total} images", total=total_images))
+                    self.log_received.emit(self._t("🔧 Translation workflow: {mode}", mode=workflow_mode))
+                    self.log_received.emit(self._t("📁 Output directory: {dir}", dir=self.output_folder))
+                    if workflow_tip:
+                        self.log_received.emit(workflow_tip)
+                    self.log_received.emit(self._t("🚀 Starting translation..."))
+                    
+                    # 初始化进度条
+                    self.progress.emit(0, total_images, "")
+                    
+                    # 并发模式：直接传递所有文件路径，不预加载图片
+                    images_with_configs = [(file_path, config) for file_path in self.files]
+                    
+                    # 调用翻译（并发流水线会自动处理）
+                    all_contexts = await translator.translate_batch(
+                        images_with_configs,
+                        save_info=save_info,
+                        global_offset=0,
+                        global_total=total_images
+                    )
+                else:
+                    # 非并发模式：前端分批加载（用于内存管理）
+                    frontend_batch_size = 10  # 每次最多加载10张图片到内存
+                    total_frontend_batches = (total_images + frontend_batch_size - 1) // frontend_batch_size
+                    
+                    # 计算后端总批次数（用于显示统一的进度）
+                    backend_total_batches = (total_images + batch_size - 1) // batch_size if batch_size > 0 else total_images
+                    
+                    self.log_received.emit(self._t("📊 Batch processing mode: {total} images in {batches} batches", total=total_images, batches=backend_total_batches))
+                    self.log_received.emit(self._t("🔧 Translation workflow: {mode}", mode=workflow_mode))
+                    self.log_received.emit(self._t("📁 Output directory: {dir}", dir=self.output_folder))
+                    if workflow_tip:
+                        self.log_received.emit(workflow_tip)
 
-                # 按批次加载和处理图片（节省内存）
-                self.log_received.emit(self._t("🚀 Starting translation..."))
-                
-                # 初始化进度条
-                self.progress.emit(0, total_images, "")
-                
-                all_contexts = []
-                processed_images_count = 0  # 已处理的图片总数
-                
-                for frontend_batch_num in range(total_frontend_batches):
-                    if not self._is_running: raise asyncio.CancelledError("Task stopped by user.")
+                    # 按批次加载和处理图片（节省内存）
+                    self.log_received.emit(self._t("🚀 Starting translation..."))
                     
-                    batch_start = frontend_batch_num * frontend_batch_size
-                    batch_end = min(batch_start + frontend_batch_size, total_images)
-                    current_batch_files = self.files[batch_start:batch_end]
+                    # 初始化进度条
+                    self.progress.emit(0, total_images, "")
                     
-                    # 加载当前批次的图片（静默加载，不显示前端批次信息）
-                    images_with_configs = []
-                    for file_path in current_batch_files:
+                    all_contexts = []
+                    processed_images_count = 0  # 已处理的图片总数
+                    
+                    for frontend_batch_num in range(total_frontend_batches):
                         if not self._is_running: raise asyncio.CancelledError("Task stopped by user.")
-                        try:
-                            # 使用二进制模式读取以避免Windows路径编码问题
-                            with open(file_path, 'rb') as f:
-                                image = Image.open(f)
-                                image.load()  # 立即加载图片数据，避免文件句柄关闭后无法访问
-                            image.name = file_path
-                            images_with_configs.append((image, config))
-                        except Exception as e:
-                            self.log_received.emit(f"⚠️ 无法加载图片 {os.path.basename(file_path)}: {e}")
-                            self.logger.error(f"Error loading image {file_path}: {e}")
-                            # 创建错误上下文
-                            from manga_translator.utils import Context
-                            error_ctx = Context()
-                            error_ctx.image_name = file_path
-                            error_ctx.translation_error = str(e)
-                            all_contexts.append(error_ctx)
+                        
+                        batch_start = frontend_batch_num * frontend_batch_size
+                        batch_end = min(batch_start + frontend_batch_size, total_images)
+                        current_batch_files = self.files[batch_start:batch_end]
+                        
+                        # 加载当前批次的图片（静默加载，不显示前端批次信息）
+                        images_with_configs = []
+                        for file_path in current_batch_files:
+                            if not self._is_running: raise asyncio.CancelledError("Task stopped by user.")
+                            try:
+                                # 使用二进制模式读取以避免Windows路径编码问题
+                                with open(file_path, 'rb') as f:
+                                    image = Image.open(f)
+                                    image.load()  # 立即加载图片数据，避免文件句柄关闭后无法访问
+                                image.name = file_path
+                                images_with_configs.append((image, config))
+                            except Exception as e:
+                                self.log_received.emit(f"⚠️ 无法加载图片 {os.path.basename(file_path)}: {e}")
+                                self.logger.error(f"Error loading image {file_path}: {e}")
+                                # 创建错误上下文
+                                from manga_translator.utils import Context
+                                error_ctx = Context()
+                                error_ctx.image_name = file_path
+                                error_ctx.translation_error = str(e)
+                                all_contexts.append(error_ctx)
+                        
+                        if images_with_configs:
+                            # 传递全局偏移量给后端，让后端显示正确的全局图片编号
+                            batch_contexts = await translator.translate_batch(
+                                images_with_configs, 
+                                save_info=save_info,
+                                global_offset=processed_images_count,  # 传递已处理的图片数
+                                global_total=total_images  # 传递总图片数
+                            )
+                            all_contexts.extend(batch_contexts)
+                            processed_images_count += len(images_with_configs)
+                            
+                            # 批次处理完成后，立即清理图片对象
+                            for image, _ in images_with_configs:
+                                if hasattr(image, 'close'):
+                                    try:
+                                        image.close()
+                                    except:
+                                        pass
+                            images_with_configs.clear()
+                            
+                            # 强制垃圾回收
+                            import gc
+                            gc.collect()
                     
-                    if images_with_configs:
-                        # 传递全局偏移量给后端，让后端显示正确的全局图片编号
-                        batch_contexts = await translator.translate_batch(
-                            images_with_configs, 
-                            save_info=save_info,
-                            global_offset=processed_images_count,  # 传递已处理的图片数
-                            global_total=total_images  # 传递总图片数
-                        )
-                        all_contexts.extend(batch_contexts)
-                        processed_images_count += len(images_with_configs)
-                        
-                        # 批次处理完成后，立即清理图片对象
-                        for image, _ in images_with_configs:
-                            if hasattr(image, 'close'):
-                                try:
-                                    image.close()
-                                except:
-                                    pass
-                        images_with_configs.clear()
-                        
-                        # 强制垃圾回收
-                        import gc
-                        gc.collect()
+                    # 非并发模式：所有批次处理完成
                 
+                # 并发模式和非并发模式都会到这里
                 contexts = all_contexts
 
                 # The backend now handles saving for batch jobs. We just need to collect the paths/status.
@@ -2259,11 +2289,16 @@ class TranslationWorker(QObject):
 
         except asyncio.CancelledError as e:
             self.log_received.emit(f"Task cancelled: {e}")
+            self.logger.warning(f"Task cancelled: {e}")
             self.error.emit(str(e))
         except Exception as e:
             import traceback
             error_message = str(e)
             error_traceback = traceback.format_exc()
+            
+            # 记录到logger，确保命令行能看到
+            self.logger.error(f"Translation error: {error_message}")
+            self.logger.error(error_traceback)
             
             # 构建友好的中文错误提示
             friendly_error = self._build_friendly_error_message(error_message, error_traceback)
@@ -2328,7 +2363,10 @@ class TranslationWorker(QObject):
             self.log_received.emit("--- 任务已取消")
         except Exception as e:
             import traceback
-            self.error.emit(f"An error occurred in the asyncio runner: {str(e)}\n{traceback.format_exc()}")
+            error_msg = f"An error occurred in the asyncio runner: {str(e)}\n{traceback.format_exc()}"
+            # 同时记录到logger，确保命令行能看到
+            self.logger.error(error_msg)
+            self.error.emit(error_msg)
         finally:
             if loop:
                 try:

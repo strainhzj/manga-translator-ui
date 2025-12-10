@@ -139,7 +139,7 @@ class MangaTranslator:
         
         self._batch_contexts = []  # 存储批量处理的上下文
         self._batch_configs = []   # 存储批量处理的配置
-        # batch_concurrent 会在 parse_init_params 中验证并设置
+        # batch_concurrent 四并发模式（默认关闭，可通过配置开启）
         self.batch_concurrent = params.get('batch_concurrent', False)
         
         # 添加模型加载状态标志
@@ -173,10 +173,10 @@ class MangaTranslator:
         # font_path 优先从配置文件读取，如果没有则使用命令行参数
         self.font_path = params.get('font_path', None)
         self.models_ttl = params.get('models_ttl', 0)
-        self.batch_size = params.get('batch_size', 1)  # 添加批量大小参数
+        self.batch_size = params.get('batch_size', 3)  # 批量大小（翻译批次）
         
-        # batch_concurrent 参数保留供未来功能使用
-        # TODO: 当前未实现，预留给未来的并发优化功能
+        # batch_concurrent 四并发流水线处理（可选功能）
+        # 开启后：检测、OCR、修复、翻译四并发，提升处理速度
             
         self.ignore_errors = params.get('ignore_errors', False)
         # check mps for apple silicon or cuda for nvidia
@@ -394,7 +394,16 @@ class MangaTranslator:
         # Prepare data for JSON serialization
         regions_data = [region.to_dict() for region in ctx.text_regions]
 
-        original_width, original_height = ctx.input.size
+        # 获取图片尺寸（优先使用保存的尺寸，兼容并发模式）
+        if hasattr(ctx, 'original_size') and ctx.original_size:
+            original_width, original_height = ctx.original_size
+        elif ctx.input and hasattr(ctx.input, 'size'):
+            original_width, original_height = ctx.input.size
+        else:
+            # 如果都没有，使用默认值或从图片文件读取
+            logger.warning(f"无法获取图片尺寸，使用默认值")
+            original_width, original_height = 0, 0
+        
         data_to_save = {
             'regions': regions_data,
             'original_width': original_width,
@@ -2375,6 +2384,7 @@ class MangaTranslator:
             self._preprocess_load_text_mode(images_with_configs)
         
         # === 步骤1: 检查是否需要使用高质量翻译模式 ===
+        is_hq_translator = False
         if images_with_configs:
             first_config = images_with_configs[0][1]
             if first_config and hasattr(first_config.translator, 'translator'):
@@ -2383,7 +2393,8 @@ class MangaTranslator:
                 is_hq_translator = translator_type in [Translator.openai_hq, Translator.gemini_hq]
                 is_import_export_mode = self.load_text or self.template
 
-                if is_hq_translator and not is_import_export_mode:
+                # 如果是高质量翻译且未启用并发模式，使用专用的高质量翻译流程
+                if is_hq_translator and not is_import_export_mode and not self.batch_concurrent:
                     logger.info(f"检测到高质量翻译器 {translator_type}，自动启用高质量翻译模式")
                     return await self._translate_batch_high_quality(images_with_configs, save_info, global_offset, global_total)
                 
@@ -2397,11 +2408,136 @@ class MangaTranslator:
         if is_template_save_mode:
             logger.info("Template+SaveText mode detected. Forcing sequential processing to save files one by one.")
             batch_size = 1  # 强制使用 batch_size=1
-        elif batch_size <= 1:
+        elif batch_size <= 1 and not self.batch_concurrent:
             logger.debug('Batch size <= 1, using sequential processing')
             batch_size = 1
         
-        # === 步骤3: 批量处理模式 ===
+        # === 步骤3: 检查是否使用并发流水线模式 ===
+        # 并发流水线支持：普通翻译、高质量翻译、单文件翻译
+        # 不支持的特殊模式：
+        # - load_text: 从JSON加载翻译
+        # - template + save_text: 导出原文
+        # - generate_and_export: 导出翻译
+        # - colorize_only: 仅上色
+        # - upscale_only: 仅超分
+        # - inpaint_only: 仅修复
+        
+        # 检查是否有不兼容的特殊模式
+        has_incompatible_mode = (
+            self.load_text or 
+            is_template_save_mode or 
+            self.generate_and_export or 
+            self.colorize_only or 
+            self.upscale_only or 
+            self.inpaint_only
+        )
+        
+        # 如果启用了并发但有不兼容模式，给出提示
+        if self.batch_concurrent and has_incompatible_mode:
+            incompatible_modes = []
+            if self.load_text:
+                incompatible_modes.append("加载翻译")
+            if is_template_save_mode:
+                incompatible_modes.append("导出原文")
+            if self.generate_and_export:
+                incompatible_modes.append("导出翻译")
+            if self.colorize_only:
+                incompatible_modes.append("仅上色")
+            if self.upscale_only:
+                incompatible_modes.append("仅超分")
+            if self.inpaint_only:
+                incompatible_modes.append("仅修复")
+            
+            logger.info(f'⚠️  并发流水线已禁用：当前模式 [{", ".join(incompatible_modes)}] 不支持并发处理')
+        
+        if self.batch_concurrent and not has_incompatible_mode:
+            mode_desc = "高质量翻译" if is_hq_translator else "标准翻译"
+            logger.info(f'🚀 启用并发流水线模式 ({mode_desc}): {len(images_with_configs)} 张图片, 翻译批量大小: {batch_size}')
+            from .concurrent_pipeline import ConcurrentPipeline
+            
+            # ✅ 预检查：如果overwrite=False，过滤掉已存在的文件（与标准流程一致）
+            results = []
+            if save_info and not save_info.get('overwrite', True):
+                filtered_images = []
+                skipped_count = 0
+                
+                for image, config in images_with_configs:
+                    image_name = image.name if hasattr(image, 'name') else None
+                    if image_name:
+                        # 并发流水线只支持普通翻译模式，检查图片文件
+                        output_path = self._calculate_output_path(image_name, save_info)
+                        if os.path.exists(output_path):
+                            logger.info(f"⏭️  Skipping existing file: {os.path.basename(output_path)}")
+                            skipped_count += 1
+                            # 立即释放图片内存
+                            if hasattr(image, 'close'):
+                                try:
+                                    image.close()
+                                except:
+                                    pass
+                            # 创建一个已跳过的上下文
+                            ctx = Context()
+                            ctx.image_name = image_name
+                            ctx.success = True
+                            ctx.skipped = True
+                            results.append(ctx)
+                            continue
+                    
+                    filtered_images.append((image, config))
+                
+                if skipped_count > 0:
+                    logger.info(f"📊 Skipped {skipped_count} existing files, processing {len(filtered_images)} remaining files")
+                
+                images_with_configs = filtered_images
+                
+                # 强制垃圾回收，立即释放被跳过的图片内存
+                if skipped_count > 0:
+                    import gc
+                    gc.collect()
+                    logger.debug(f"🧹 Garbage collection completed after skipping {skipped_count} files")
+                
+                # 如果所有文件都已存在，直接返回
+                if len(images_with_configs) == 0:
+                    logger.info("✅ All files already exist, nothing to process")
+                    return results
+            
+            # 保存save_info供并发流水线使用
+            self._current_save_info = save_info
+            
+            pipeline = ConcurrentPipeline(self, batch_size)
+            
+            # 提取文件路径和配置
+            file_paths = []
+            configs = []
+            for item in images_with_configs:
+                # item 可能是 (image, config) 或 image
+                if isinstance(item, tuple):
+                    image, config = item
+                    # 如果 image 是 PIL.Image 对象且有 name 属性（文件路径）
+                    if hasattr(image, 'name'):
+                        file_paths.append(image.name)
+                    else:
+                        # 如果是字符串，直接作为路径
+                        file_paths.append(str(image))
+                    configs.append(config)
+                else:
+                    # 单个图片对象
+                    if hasattr(item, 'name'):
+                        file_paths.append(item.name)
+                    else:
+                        file_paths.append(str(item))
+                    # 使用默认配置
+                    configs.append(images_with_configs[0][1] if isinstance(images_with_configs[0], tuple) else None)
+            
+            # 使用并发流水线处理（分批加载图片）
+            contexts = await pipeline.process_batch(file_paths, configs)
+            
+            # 合并跳过的结果和处理的结果
+            results.extend(contexts)
+            
+            return results
+        
+        # === 步骤4: 批量处理模式（顺序处理） ===
         logger.info(f'Starting batch translation: {len(images_with_configs)} images, batch size: {batch_size}')
         import sys
         
@@ -3172,6 +3308,40 @@ class MangaTranslator:
                                 'original_texts': [region.text for region in ctx.text_regions]
                             }
                             batch_original_texts.append(image_data)
+                    
+                    # ✅ 为HQ翻译器准备high_quality_batch_data（包含图片和text_regions）
+                    # 这是HQ翻译器进入高质量批量模式的必要条件，也是AI断句检查能正常工作的前提
+                    if sample_config.translator.translator in [Translator.openai_hq, Translator.gemini_hq]:
+                        hq_batch_data = []
+                        global_text_index = 1  # 全局文本编号从1开始（与提示词中的编号一致）
+                        for ctx, _ in batch:
+                            if ctx.text_regions:
+                                num_regions = len(ctx.text_regions)
+                                # 为当前图片生成全局连续的文本编号
+                                text_order = list(range(global_text_index, global_text_index + num_regions))
+                                global_text_index += num_regions
+                                
+                                upscaled_size = None
+                                # 使用超分后的图片尺寸（如果有超分），否则使用上色后的图片尺寸
+                                if hasattr(ctx, 'upscaled') and ctx.upscaled is not None:
+                                    upscaled_size = ctx.upscaled.shape[:2]  # (height, width)
+                                elif hasattr(ctx, 'img_colorized') and ctx.img_colorized is not None:
+                                    upscaled_size = ctx.img_colorized.shape[:2]
+                                elif hasattr(ctx, 'img_rgb') and ctx.img_rgb is not None:
+                                    upscaled_size = ctx.img_rgb.shape[:2]
+                                
+                                img_data = {
+                                    'image': ctx.input if hasattr(ctx, 'input') else None,
+                                    'text_regions': ctx.text_regions,
+                                    'original_texts': [region.text for region in ctx.text_regions],
+                                    'text_order': text_order,
+                                    'upscaled_size': upscaled_size
+                                }
+                                hq_batch_data.append(img_data)
+                        
+                        if hq_batch_data:
+                            merged_ctx.high_quality_batch_data = hq_batch_data
+                            logger.debug(f"[Batch] Prepared high_quality_batch_data for {len(hq_batch_data)} images")
                     
                     translated_texts = await self._batch_translate_texts(
                         all_texts, 

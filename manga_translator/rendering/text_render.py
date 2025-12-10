@@ -804,7 +804,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
                     
                     # 在竖排行的中心对齐旋转块
                     line_start_x = pen_line[0] - font_size
-                    paste_x = line_start_x + (font_size - rw) // 2
+                    paste_x = line_start_x + round((font_size - rw) / 2.0)
                     paste_y = pen_line[1]
                     
                     # 边界检查和调整
@@ -868,7 +868,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
                     # 修复：在竖排行的中心正确地对齐横排块
                     # pen_line[0] 是右边界，font_size 是行宽
                     line_start_x = pen_line[0] - font_size
-                    paste_x = line_start_x + (font_size - rw) // 2
+                    paste_x = line_start_x + round((font_size - rw) / 2.0)
 
                     # 横排块的Y位置：直接从pen_line[1]开始，不做baseline对齐
                     # pen_line[1]是当前渲染位置（前一个字符的底部）
@@ -903,7 +903,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
                             logger.warning(f"Text block too large for canvas, skipping. Size: {rw}x{rh}, Canvas: {canvas_w}x{canvas_h}")
                             continue
 
-                        logger.info(f"Adjusted text position to fit canvas bounds: ({line_start_x + (font_size - rw) // 2}, {pen_line[1]}) -> ({paste_x}, {paste_y})")
+                        logger.info(f"Adjusted text position to fit canvas bounds: ({line_start_x + round((font_size - rw) / 2.0)}, {pen_line[1]}) -> ({paste_x}, {paste_y})")
 
                     target_text_roi = canvas_text[paste_y:paste_y+rh, paste_x:paste_x+rw]
                     canvas_text[paste_y:paste_y+rh, paste_x:paste_x+rw] = np.maximum(target_text_roi, horizontal_block_text)

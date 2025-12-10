@@ -372,10 +372,9 @@ class MainView(QWidget):
 
             # 跳过这些选项，因为已经用下拉框替代或不需要在UI中显示
             # realcugan_model 将通过 upscale_ratio 动态下拉框处理
-            # batch_concurrent 并发处理已隐藏
             # gimp_font 已废弃，使用 font_path 代替
             # translator.attempts 隐藏，始终与 cli.attempts 同步
-            if full_key in ["cli.load_text", "cli.template", "cli.generate_and_export", "cli.colorize_only", "cli.upscale_only", "cli.inpaint_only", "upscale.realcugan_model", "cli.batch_concurrent", "render.gimp_font", "translator.attempts"]:
+            if full_key in ["cli.load_text", "cli.template", "cli.generate_and_export", "cli.colorize_only", "cli.upscale_only", "cli.inpaint_only", "upscale.realcugan_model", "render.gimp_font", "translator.attempts"]:
                 continue
 
             label_text = key

@@ -369,6 +369,8 @@ class CliConfig(BaseModel):
     """Context size for translation"""
     batch_size: int = 1
     """Batch size for processing"""
+    batch_concurrent: bool = False
+    """Enable concurrent pipeline (Detection, OCR, Inpainting, Translation in parallel)"""
     format: Optional[str] = None
     """Output format"""
     save_quality: int = 100
