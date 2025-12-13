@@ -1,8 +1,9 @@
---extra-index-url https://download.pytorch.org/whl/cu129
+--index-url https://download.pytorch.org/whl/cu129
+--extra-index-url https://pypi.org/simple
 
-torch==2.8.0+cu129
-torchvision==0.23.0+cu129
-torchaudio==2.8.0+cu129
+torch==2.8.0
+torchvision==0.23.0
+torchaudio==2.8.0
 
 aiofiles==24.1.0
 aiohttp==3.12.15
