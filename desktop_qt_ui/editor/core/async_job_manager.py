@@ -309,17 +309,38 @@ class AsyncJobManager:
             self.cancel_all()
         
         # 停止事件循环
-        if self._loop:
-            self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._loop and not self._loop.is_closed():
+            try:
+                self._loop.call_soon_threadsafe(self._loop.stop)
+            except RuntimeError:
+                # 事件循环可能已经停止
+                pass
         
         # 等待线程结束
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5.0)
         
         self._running = False
+        
+        # 关闭事件循环
+        if self._loop and not self._loop.is_closed():
+            try:
+                # 取消所有待处理的任务
+                pending = asyncio.all_tasks(self._loop)
+                for task in pending:
+                    task.cancel()
+                # 关闭事件循环
+                self._loop.close()
+            except Exception as e:
+                self.logger.warning(f"Error closing event loop: {e}")
+        
         self.logger.info("AsyncJobManager shutdown complete")
     
     def __del__(self):
         """析构函数"""
-        self.shutdown(wait=False)
+        try:
+            self.shutdown(wait=False)
+        except Exception:
+            # 忽略析构时的错误
+            pass
 
