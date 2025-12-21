@@ -98,6 +98,7 @@ def apply_dictionary(text, dictionary):
     for pattern, value, line_number in dictionary:
         original_text = text  
         text = pattern.sub(value, text)
+    return text
 
 def parse_upscale_ratio(upscale_ratio) -> float:
     """
