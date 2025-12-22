@@ -471,7 +471,17 @@ if exist ".git" (
             "%GIT%" fetch origin
             if !ERRORLEVEL! neq 0 (
                 echo [WARNING] 获取更新失败,可能是网络问题
-            ) else (
+                echo.
+                echo 请选择:
+                echo [1] 重试
+                echo [2] 退出
+                echo.
+                set /p network_choice="请选择 (1/2, 默认1): "
+                
+                if "!network_choice!"=="2" goto :install_cancelled
+                echo [INFO] 重试获取更新...
+                goto :clone_repo
+            )
                 echo 强制同步到远程主分支...
                 "%GIT%" reset --hard origin/main
                 if !ERRORLEVEL! == 0 (
@@ -486,41 +496,39 @@ if exist ".git" (
                         echo [OK] 代码已更新到最新版本
                         echo.
                         goto :create_venv
+                    ) else (
+                        echo [WARNING] 同步失败
+                        echo.
+                        echo 请选择:
+                        echo [1] 重试
+                        echo [2] 退出
+                        echo.
+                        set /p sync_choice="请选择 (1/2, 默认1): "
+                        
+                        if "!sync_choice!"=="2" goto :install_cancelled
+                        echo [INFO] 重试同步...
+                        goto :clone_repo
                     )
                 )
             )
-            
-            echo [WARNING] 自动更新失败,将删除并重新克隆
-            echo.
         ) else (
-            echo [警告] 仓库地址不匹配
+            echo [警告] 仓库地址不匹配,将删除并重新克隆
+            echo 当前仓库: !CURRENT_REPO!
+            echo 目标仓库: !REPO_URL!
             echo.
-            echo 请选择:
-            echo [1] 删除现有仓库并克隆新仓库
-            echo [2] 保留现有仓库,跳过克隆
-            echo [3] 退出安装
-            echo.
-            set /p mismatch_choice="请选择 (1/2/3): "
-            
-            if "!mismatch_choice!"=="2" (
-                echo [INFO] 保留现有仓库
-                goto :create_venv
-            ) else if "!mismatch_choice!"=="3" (
-                exit /b 0
-            )
-            
-            echo 正在删除现有仓库...
         )
     ) else (
-        echo [WARNING] 无法读取仓库信息,将重新克隆
+        echo [WARNING] 无法读取仓库信息,将删除并重新克隆
+        echo.
     )
     
-    REM 删除现有文件和目录(保留venv、PortableGit、Python-3.12.12、Portable7z)
+:delete_and_clone
+    REM 删除现有文件和目录(保留venv、PortableGit、Python-3.12.12、Portable7z、Miniconda3)
     echo 正在清理旧文件...
     
-    REM 删除目录(保留venv、PortableGit、Python-3.12.12、Portable7z)
+    REM 删除目录(保留venv、PortableGit、Python-3.12.12、Portable7z、Miniconda3)
     for /d %%d in (*) do (
-        if /i not "%%d"=="venv" if /i not "%%d"=="PortableGit" if /i not "%%d"=="Python-3.12.12" if /i not "%%d"=="Portable7z" (
+        if /i not "%%d"=="venv" if /i not "%%d"=="PortableGit" if /i not "%%d"=="Python-3.12.12" if /i not "%%d"=="Portable7z" if /i not "%%d"=="Miniconda3" (
             echo 删除目录: %%d
             rmdir /s /q "%%d" 2>nul
         )
@@ -974,3 +982,9 @@ if /i "%run_now%"=="y" (
 echo.
 echo 安装流程已结束
 pause
+
+:install_cancelled
+echo.
+echo 安装已取消
+pause
+exit /b 1

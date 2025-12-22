@@ -400,8 +400,10 @@ class MangaJaNaiUpscaler(OfflineUpscaler):
         return best_model
 
     async def _load(self, device: str):
-        # Initial load using self.model_file (which is either specific or a default for auto)
-        await self._load_specific_model(self.model_file, device)
+        # 延迟加载：不在这里加载模型，等到 _infer 时根据图片类型再加载
+        # 只保存 device 信息
+        self.device = device
+        logger.info(f"MangaJaNai upscaler initialized, will load model based on image type")
 
     async def _load_specific_model(self, filename: str, device: str):
         if self.current_loaded_model_file == filename and self.model is not None:
@@ -451,7 +453,6 @@ class MangaJaNaiUpscaler(OfflineUpscaler):
         self.model = self.model.to(device)
         self.device = device
         self.current_loaded_model_file = filename
-        logger.info(f"Loaded MangaJaNai model {filename} with scale {self.scale}x")
 
     async def _unload(self):
         if self.model:
