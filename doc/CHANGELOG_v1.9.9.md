@@ -13,4 +13,4 @@
 - **修复 MangaJaNai 模型切换显存问题**：修复在自动模式（x2/x4）下，从黑白图片切换到彩色图片时，旧模型未卸载导致显存占用过高的问题
 
 ### 上色模块修复
-- **修复并发模式下上色失败问题**：修复在并发流水线模式下，`_run_colorizer` 方法因 `**ctx` 展开导致参数冲突，使 `image` 参数接收到字符串而非 PIL Image 对象的问题（错误信息：`str object has no attribute 'convert'`）
+- **修复并行模式禁用时图片加载问题**：修复当用户启用并行模式但因特殊模式（如"仅上色"）导致并行被禁用时，系统未正确加载图片导致 `ctx.input` 为文件路径字符串而非 PIL Image 对象的问题（错误信息：`str object has no attribute 'convert'`）
