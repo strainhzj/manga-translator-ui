@@ -522,13 +522,42 @@ if exist ".git" (
         echo.
     )
     
+    REM 清理前确认
+    echo ========================================
+    echo [警告] 即将删除现有文件
+    echo ========================================
+    echo.
+    echo 将删除以下内容:
+    echo   - 所有代码文件
+    echo   - .git 目录
+    echo.
+    echo 将保留以下内容:
+    echo   - venv / conda_env (Python环境)
+    echo   - PortableGit (便携版Git)
+    echo   - Miniconda3 (Conda环境)
+    echo   - 安装脚本
+    echo.
+    echo 是否继续?
+    echo [1] 是 - 删除并重新克隆
+    echo [2] 否 - 取消安装
+    echo.
+    set /p confirm_delete="请选择 (1/2, 默认2): "
+    
+    if not "!confirm_delete!"=="1" (
+        echo.
+        echo 安装已取消
+        pause
+        exit /b 1
+    )
+    
 :delete_and_clone
-    REM 删除现有文件和目录(保留venv、PortableGit、Python-3.12.12、Portable7z、Miniconda3)
+    REM 删除现有文件和目录(保留venv、PortableGit、Python-3.12.12、Portable7z、Miniconda3、conda_env)
+    echo.
     echo 正在清理旧文件...
     
-    REM 删除目录(保留venv、PortableGit、Python-3.12.12、Portable7z、Miniconda3)
+    REM 删除目录(保留venv、conda_env、PortableGit、Python-3.12.12、Portable7z、Miniconda3)
     for /d %%d in (*) do (
-        if /i not "%%d"=="venv" if /i not "%%d"=="PortableGit" if /i not "%%d"=="Python-3.12.12" if /i not "%%d"=="Portable7z" if /i not "%%d"=="Miniconda3" (
+        if /i not "%%d"=="venv" if /i not "%%d"=="conda_env" if /i not "%%d"=="PortableGit" if /i not "%%d"=="Python-3.12.12" if /i not "%%d"=="Portable7z" if /i not "%%d"=="Miniconda3" (
             echo 删除目录: %%d
             rmdir /s /q "%%d" 2>nul
         )
