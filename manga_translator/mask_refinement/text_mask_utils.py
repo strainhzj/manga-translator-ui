@@ -133,9 +133,26 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
 
         for tl_idx in range(M):
             area2 = polys[tl_idx].area
-            overlapping_area = polys[tl_idx].intersection(cc_poly).area
+            try:
+                # 尝试计算交集，如果几何体无效则使用 buffer(0) 修复
+                overlapping_area = polys[tl_idx].intersection(cc_poly).area
+            except Exception as e:
+                # 几何体无效时，尝试使用 buffer(0) 修复
+                try:
+                    fixed_poly = polys[tl_idx].buffer(0)
+                    fixed_cc_poly = cc_poly.buffer(0)
+                    overlapping_area = fixed_poly.intersection(fixed_cc_poly).area
+                except Exception:
+                    # 如果仍然失败，设置为 0
+                    overlapping_area = 0
+            
             ratio_mat[label, tl_idx] = overlapping_area / min(area1, area2)
-            dist_mat[label, tl_idx] = polys[tl_idx].distance(cc_poly.centroid)
+            
+            try:
+                dist_mat[label, tl_idx] = polys[tl_idx].distance(cc_poly.centroid)
+            except Exception:
+                # 如果距离计算失败，使用一个大值
+                dist_mat[label, tl_idx] = float('inf')
             # print(textlines[tl_idx].pts, cc_pts, '->', overlapping_area, min(area1, area2), '=', overlapping_area / min(area1, area2), '|', polys[tl_idx].distance(cc_poly))
 
         avg = np.argmax(ratio_mat[label])
