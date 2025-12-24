@@ -141,6 +141,7 @@ def _run_translate_sync(pil_image, config: Config, task_id: str = None, cancel_c
         cancel_check_callback: 取消检查回调函数
     """
     import threading
+    import gc
     from manga_translator.server.core.task_manager import update_task_thread_id, get_global_translator
     
     # 更新任务的线程ID
@@ -158,12 +159,34 @@ def _run_translate_sync(pil_image, config: Config, task_id: str = None, cancel_c
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(translator.translate(pil_image, config))
+        result = loop.run_until_complete(translator.translate(pil_image, config))
+        return result
     finally:
-        loop.close()
-        # 清除取消回调，避免影响下一个任务
-        if cancel_check_callback:
-            translator.set_cancel_check_callback(None)
+        try:
+            # 清除取消回调，避免影响下一个任务
+            if cancel_check_callback:
+                translator.set_cancel_check_callback(None)
+            
+            # 关闭事件循环前，取消所有待处理的任务
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            
+            # 等待所有任务取消完成
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            
+            # 关闭事件循环
+            loop.close()
+            
+            # 清除线程局部的事件循环引用（Docker环境关键）
+            asyncio.set_event_loop(None)
+            
+            # 强制垃圾回收，清理线程局部存储
+            gc.collect()
+            
+        except Exception as e:
+            logger.warning(f"线程清理时出错: {e}")
 
 
 def _run_translate_batch_sync(images_with_configs: list, batch_size: int, task_id: str = None, cancel_check_callback=None):
@@ -179,6 +202,7 @@ def _run_translate_batch_sync(images_with_configs: list, batch_size: int, task_i
         cancel_check_callback: 取消检查回调函数
     """
     import threading
+    import gc
     from manga_translator.server.core.task_manager import update_task_thread_id, get_global_translator
     
     # 更新任务的线程ID
@@ -196,12 +220,34 @@ def _run_translate_batch_sync(images_with_configs: list, batch_size: int, task_i
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(translator.translate_batch(images_with_configs, batch_size))
+        result = loop.run_until_complete(translator.translate_batch(images_with_configs, batch_size))
+        return result
     finally:
-        loop.close()
-        # 清除取消回调
-        if cancel_check_callback:
-            translator.set_cancel_check_callback(None)
+        try:
+            # 清除取消回调
+            if cancel_check_callback:
+                translator.set_cancel_check_callback(None)
+            
+            # 关闭事件循环前，取消所有待处理的任务
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            
+            # 等待所有任务取消完成
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            
+            # 关闭事件循环
+            loop.close()
+            
+            # 清除线程局部的事件循环引用（Docker环境关键）
+            asyncio.set_event_loop(None)
+            
+            # 强制垃圾回收，清理线程局部存储
+            gc.collect()
+            
+        except Exception as e:
+            logger.warning(f"线程清理时出错: {e}")
 
 
 def prepare_translator_params(config: Config, workflow: str = "normal") -> dict:
