@@ -111,7 +111,6 @@ class CliSettings(BaseModel):
     attempts: int = -1
     ignore_errors: bool = False
     use_gpu: bool = True
-    use_gpu_limited: bool = False
     context_size: int = 3
     format: str = "不指定"
     overwrite: bool = True

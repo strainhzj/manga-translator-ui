@@ -13,8 +13,6 @@ from .original import OriginalTranslator
 from ..config import Config, Translator, TranslatorConfig, TranslatorChain
 from ..utils import Context
 
-OFFLINE_TRANSLATORS = {}
-
 GPT_TRANSLATORS = {
     Translator.openai: OpenAITranslator,
     Translator.openai_hq: OpenAIHighQualityTranslator,
@@ -27,7 +25,6 @@ TRANSLATORS = {
     Translator.original: OriginalTranslator,
     Translator.sakura: SakuraTranslator,
     **GPT_TRANSLATORS,
-    **OFFLINE_TRANSLATORS,
 }
 translator_cache = {}
 
@@ -44,8 +41,6 @@ async def prepare(chain: TranslatorChain):
     for key, tgt_lang in chain.chain:
         translator = get_translator(key)
         translator.supports_languages('auto', tgt_lang, fatal=True)
-        if isinstance(translator, OfflineTranslator):
-            await translator.download()
 
 # TODO: Optionally take in strings instead of TranslatorChain for simplicity
 async def dispatch(chain: TranslatorChain, queries: List[str], config: Config, use_mtpe: bool = False, args:Optional[Context] = None, device: str = 'cpu') -> List[str]:
@@ -61,20 +56,14 @@ async def dispatch(chain: TranslatorChain, queries: List[str], config: Config, u
                 #translator = get_translator(key)
             #if translator is None:
             translator = get_translator(chain.translators[flag])
-            if isinstance(translator, OfflineTranslator):
-                await translator.load('auto', chain.langs[flag], device)
-                pass
             translator.parse_args(config.translator)
             queries = await translator.translate('auto', chain.langs[flag], queries, use_mtpe)
-            await translator.unload(device)
             flag+=1
         return queries
     if args is not None:
         args['translations'] = {}
     for key, tgt_lang in chain.chain:
         translator = get_translator(key)
-        if isinstance(translator, OfflineTranslator):
-            await translator.load('auto', tgt_lang, device)
         translator.parse_args(config.translator)
         if key.value in ["gemini_hq", "openai_hq"]:
             queries = await translator.translate('auto', tgt_lang, queries, ctx=args)

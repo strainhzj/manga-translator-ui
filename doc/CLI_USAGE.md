@@ -1382,7 +1382,6 @@ python -m manga_translator shared --models-ttl 300 --retry-attempts 3
 
 ### 运行参数（仅命令行）
 - `use_gpu` - 使用 GPU 加速
-- `use_gpu_limited` - 使用 GPU 限制模式
 - `retry_attempts` - 翻译失败重试次数
 
 > ⚠️ **重要**：这些参数**仅在命令行模式下有效**。在 API 模式下，这些设置会被**自动忽略**：

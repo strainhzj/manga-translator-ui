@@ -33,8 +33,7 @@ class TranslatorChain:
         """
         Returns True if the chain contains offline translators.
         """
-        from manga_translator.translators import OFFLINE_TRANSLATORS
-        return any(translator in OFFLINE_TRANSLATORS for translator in self.translators)
+        return False
 
     def __eq__(self, __o: object) -> bool:
         if type(__o) is str:
@@ -117,7 +116,6 @@ class Translator(str, Enum):
     sakura = "sakura"
     none = "none"
     original = "original"
-    offline = "offline"
 
     def __str__(self):
         return self.name
@@ -368,8 +366,6 @@ class CliConfig(BaseModel):
     """Enable verbose logging"""
     use_gpu: bool = True
     """Use GPU for processing"""
-    use_gpu_limited: bool = False
-    """Use limited GPU memory mode"""
     context_size: int = 3
     """Context size for translation"""
     batch_size: int = 1

@@ -482,9 +482,6 @@ class ExportService:
         if 'use_gpu' in cli_config:
             translator_params['use_gpu'] = cli_config['use_gpu']
             self.logger.info(f"设置GPU配置: use_gpu={cli_config['use_gpu']}")
-        if 'use_gpu_limited' in cli_config:
-            translator_params['use_gpu_limited'] = cli_config['use_gpu_limited']
-            self.logger.info(f"设置GPU配置: use_gpu_limited={cli_config['use_gpu_limited']}")
         
         # 设置其他参数
         translator_params.update(config)

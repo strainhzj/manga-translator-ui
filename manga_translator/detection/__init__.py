@@ -187,7 +187,9 @@ def merge_detection_boxes(yolo_boxes: List[Quadrilateral], main_boxes: List[Quad
             # YOLO框包含了至少一个主检测器框
             if can_replace:
                 # 满足了替换条件（面积 >= 2倍），但还需要检查与其他未包含主框的重叠率
-                if max_overlap_ratio_with_others >= overlap_threshold:
+                # 对于满足2倍面积条件的框，允许更高的重叠率（阈值+0.1）
+                adjusted_threshold = overlap_threshold + 0.1
+                if max_overlap_ratio_with_others >= adjusted_threshold:
                     # 与其他主框重叠率过高，删除这个YOLO框，不进行替换
                     yolo_boxes_to_remove.add(yolo_idx)
                 else:

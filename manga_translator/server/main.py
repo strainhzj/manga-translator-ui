@@ -294,8 +294,6 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     ]
     if params.use_gpu:
         cmds.append('--use-gpu')
-    if params.use_gpu_limited:
-        cmds.append('--use-gpu-limited')
     if params.ignore_errors:
         cmds.append('--ignore-errors')
     if params.verbose:
@@ -351,7 +349,6 @@ def run_server(args):
     
     # 设置服务器配置（在 prepare 之前）
     task_manager.server_config['use_gpu'] = getattr(args, 'use_gpu', False)
-    task_manager.server_config['use_gpu_limited'] = getattr(args, 'use_gpu_limited', False)
     task_manager.server_config['verbose'] = getattr(args, 'verbose', False)
     task_manager.server_config['models_ttl'] = getattr(args, 'models_ttl', 0)
     task_manager.server_config['retry_attempts'] = getattr(args, 'retry_attempts', None)
@@ -361,7 +358,7 @@ def run_server(args):
     if config_manager.admin_settings.get('max_concurrent_tasks'):
         task_manager.server_config['max_concurrent_tasks'] = config_manager.admin_settings['max_concurrent_tasks']
     
-    print(f"[SERVER CONFIG] use_gpu={task_manager.server_config['use_gpu']}, use_gpu_limited={task_manager.server_config['use_gpu_limited']}, verbose={task_manager.server_config['verbose']}, models_ttl={task_manager.server_config['models_ttl']}, retry_attempts={task_manager.server_config['retry_attempts']}, max_concurrent_tasks={task_manager.server_config['max_concurrent_tasks']}")
+    print(f"[SERVER CONFIG] use_gpu={task_manager.server_config['use_gpu']}, verbose={task_manager.server_config['verbose']}, models_ttl={task_manager.server_config['models_ttl']}, retry_attempts={task_manager.server_config['retry_attempts']}, max_concurrent_tasks={task_manager.server_config['max_concurrent_tasks']}")
     
     # 初始化并发控制
     task_manager.init_semaphore()

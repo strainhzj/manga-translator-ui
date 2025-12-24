@@ -48,5 +48,4 @@ def parse_arguments():
     parser.add_argument('--post-dict', default=None, type=file_path, help='Path to the post-translation dictionary file')    
     g = parser.add_mutually_exclusive_group()
     g.add_argument('--use-gpu', action='store_true', help='Turn on/off gpu (auto switch between mps and cuda)')
-    g.add_argument('--use-gpu-limited', action='store_true', help='Turn on/off gpu (excluding offline translator)')
     return parser.parse_args()

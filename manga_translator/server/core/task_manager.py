@@ -33,7 +33,6 @@ _translator_params_hash = None  # 记录当前翻译器的参数哈希，用于�
 # 全局服务器配置（从启动参数设置）
 server_config = {
     'use_gpu': False,
-    'use_gpu_limited': False,
     'verbose': False,
     'models_ttl': 0,
     'retry_attempts': None,
@@ -210,7 +209,7 @@ def update_server_config(config: dict):
     
     # 检查是否需要重建翻译器
     rebuild_translator = False
-    key_params = ['use_gpu', 'use_gpu_limited', 'verbose', 'models_ttl']
+    key_params = ['use_gpu', 'verbose', 'models_ttl']
     for key in key_params:
         if key in config and config[key] != server_config.get(key):
             rebuild_translator = True
@@ -225,7 +224,7 @@ def update_server_config(config: dict):
             init_semaphore()
             logger.info(f"并发数已更新: {old_value} -> {new_value}")
     
-    for key in ['use_gpu', 'use_gpu_limited', 'verbose', 'models_ttl', 'retry_attempts', 'admin_password']:
+    for key in ['use_gpu', 'verbose', 'models_ttl', 'retry_attempts', 'admin_password']:
         if key in config:
             server_config[key] = config[key]
     
@@ -282,7 +281,7 @@ def shutdown_executor():
 
 def _get_params_hash(params: dict) -> str:
     """计算参数哈希，用于判断是否需要重建翻译器"""
-    key_params = ['use_gpu', 'use_gpu_limited', 'verbose', 'models_ttl']
+    key_params = ['use_gpu', 'verbose', 'models_ttl']
     values = tuple(params.get(k) for k in key_params)
     return str(values)
 
@@ -311,7 +310,6 @@ def get_global_translator(params: dict = None):
     if params is None:
         params = {
             'use_gpu': server_config.get('use_gpu', False),
-            'use_gpu_limited': server_config.get('use_gpu_limited', False),
             'verbose': server_config.get('verbose', False),
             'models_ttl': server_config.get('models_ttl', 0),
         }

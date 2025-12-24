@@ -112,6 +112,8 @@ from manga_translator.server.core.task_manager import (
     cancel_task,
     update_server_config,
     get_server_config,
+    cleanup_after_request,
+    cleanup_context,
 )
 
 # 响应工具
@@ -207,6 +209,8 @@ __all__ = [
     'cancel_task',
     'update_server_config',
     'get_server_config',
+    'cleanup_after_request',
+    'cleanup_context',
     # 响应工具
     'transform_to_image',
     'transform_to_json',

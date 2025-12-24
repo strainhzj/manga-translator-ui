@@ -356,9 +356,7 @@ OCR：
 
 翻译器 (Translator)：
 
-- 日语 -> 英语：**Sugoi**
-- 中文 (简体) -> 英语：??
-- 中文 (简体) -> 日语：??
+- 推荐使用高质量翻译器（OpenAI HQ、Gemini HQ）获得最佳翻译效果
 - 日语 -> 中文 (简体)：sakura 或 opanai
 - 英语 -> 日语：??
 - 英语 -> 中文 (简体)：??
@@ -1138,17 +1136,6 @@ FIL: 菲律宾语（他加禄语）
 | papago        |         |         |                                                          |  
 | sakura        |         |         | 需要 `SAKURA_API_BASE`                               |  
 | custom_openai |         |         | 需要 `CUSTOM_OPENAI_API_BASE` `CUSTOM_OPENAI_MODEL` |  
-| offline       |         | ✔️      | 为语言选择最合适的离线翻译器    |  
-| nllb          |         | ✔️      | 离线翻译模型                                 |  
-| nllb_big      |         | ✔️      | 更大的NLLB模型                               |  
-| sugoi         |         | ✔️      | Sugoi V4.0 模型                                        |  
-| jparacrawl    |         | ✔️      | 日文翻译模型                                  |  
-| jparacrawl_big|         | ✔️      | 更大的日文翻译模型                            |  
-| m2m100        |         | ✔️      | 支持多语言翻译                                  |  
-| m2m100_big    |         | ✔️      | 更大的M2M100模型                               |  
-| mbart50       |         | ✔️      | 多语言翻译模型                                |  
-| qwen2         |         | ✔️      | 千问2模型                                     |  
-| qwen2_big     |         | ✔️      | 更大的千问2模型                               |  
 | none          |         | ✔️      | 翻译为空文本                                 |  
 | original      |         | ✔️      | 保留原始文本                                      |  
 
@@ -1159,10 +1146,6 @@ FIL: 菲律宾语（他加禄语）
 OPENAI_API_KEY=sk-xxxxxxx...
 DEEPL_AUTH_KEY=xxxxxxxx...
 ```
-
--   Offline：翻译器是否可以离线使用。
-
--   Sugoi 由 mingshiba 创建，请在 <https://www.patreon.com/mingshiba> 支持他
 
 #### 术语表
 

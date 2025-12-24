@@ -15,7 +15,6 @@
 ### 翻译器设置
 
 - **翻译器 (translator)**：选择翻译引擎
-  - 离线翻译器：Sugoi、NLLB、M2M100 等
   - 在线翻译器：Google Gemini、OpenAI、DeepL、百度翻译等
   - 高质量翻译器：高质量翻译 OpenAI、高质量翻译 Gemini（推荐）
 
@@ -49,8 +48,6 @@
 - **详细日志 (verbose)**：输出详细的调试信息
 
 - **使用 GPU (use_gpu)**：启用 GPU 加速
-
-- **使用受限 GPU (use_gpu_limited)**：使用受限 GPU 模式（降低显存占用）
 
 - **重试次数 (attempts)**：错误重试次数（-1 = 无限重试）
 

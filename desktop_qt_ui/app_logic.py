@@ -485,35 +485,94 @@ class MainAppLogic(QObject):
                     base_url=api_base or "https://api.openai.com/v1"
                 )
                 
-                # 如果指定了模型，测试该模型是否可用
-                if model and model.strip():
-                    try:
-                        # 尝试用该模型发送一个简单的测试请求
-                        await client.chat.completions.create(
-                            model=model,
-                            messages=[{"role": "user", "content": "test"}],
-                            max_tokens=5
-                        )
-                        return True, f"连接成功，模型 {model} 可用"
-                    except Exception as e:
-                        # 如果模型测试失败，返回详细错误
-                        return False, f"连接成功但模型 {model} 不可用: {str(e)}"
-                else:
-                    # 没有指定模型，只测试连接
-                    await client.models.list()
-                    return True, "连接成功"
+                try:
+                    # 如果指定了模型，测试该模型是否可用
+                    if model and model.strip():
+                        try:
+                            # 尝试用该模型发送一个简单的测试请求
+                            await client.chat.completions.create(
+                                model=model,
+                                messages=[{"role": "user", "content": "test"}],
+                                max_tokens=5
+                            )
+                            return True, f"连接成功，模型 {model} 可用"
+                        except Exception as e:
+                            # 如果模型测试失败，返回详细错误
+                            return False, f"连接成功但模型 {model} 不可用: {str(e)}"
+                    else:
+                        # 没有指定模型，只测试连接
+                        await client.models.list()
+                        return True, "连接成功"
+                finally:
+                    await client.close()
             
             elif "gemini" in translator_key.lower():
                 import google.generativeai as genai
                 
-                # 如果指定了自定义API Base，使用OpenAI兼容模式
-                if api_base and api_base != "https://generativelanguage.googleapis.com":
+                # 如果指定了自定义API Base（非空且非官方地址），使用OpenAI兼容模式
+                is_custom_api = (
+                    api_base 
+                    and api_base.strip() 
+                    and api_base.strip() not in ["https://generativelanguage.googleapis.com", "https://generativelanguage.googleapis.com/"]
+                )
+                
+                if is_custom_api:
                     from openai import AsyncOpenAI
                     client = AsyncOpenAI(
                         api_key=api_key,
-                        base_url=api_base
+                        base_url=api_base.strip()
                     )
                     
+                    try:
+                        # 如果指定了模型，测试该模型
+                        if model and model.strip():
+                            try:
+                                await client.chat.completions.create(
+                                    model=model,
+                                    messages=[{"role": "user", "content": "test"}],
+                                    max_tokens=5
+                                )
+                                return True, f"连接成功，模型 {model} 可用"
+                            except Exception as e:
+                                return False, f"连接成功但模型 {model} 不可用: {str(e)}"
+                        else:
+                            await client.models.list()
+                            return True, "连接成功"
+                    finally:
+                        await client.close()
+                else:
+                    # 使用官方Gemini API - 在线程池中执行同步调用
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    
+                    def sync_test():
+                        genai.configure(api_key=api_key)
+                        
+                        # 如果指定了模型，测试该模型
+                        if model and model.strip():
+                            test_model = genai.GenerativeModel(model)
+                            test_model.generate_content("test")
+                            return True, f"连接成功，模型 {model} 可用"
+                        else:
+                            list(genai.list_models())
+                            return True, "连接成功"
+                    
+                    try:
+                        return await loop.run_in_executor(None, sync_test)
+                    except Exception as e:
+                        return False, f"连接失败: {str(e)}"
+            
+            elif "sakura" in translator_key.lower():
+                # Sakura使用OpenAI兼容API
+                from openai import AsyncOpenAI
+                if not api_base:
+                    return False, "请先配置SAKURA_API_BASE"
+                client = AsyncOpenAI(
+                    api_key="sk-114514",  # Sakura使用固定密钥
+                    base_url=api_base
+                )
+                
+                try:
                     # 如果指定了模型，测试该模型
                     if model and model.strip():
                         try:
@@ -528,46 +587,8 @@ class MainAppLogic(QObject):
                     else:
                         await client.models.list()
                         return True, "连接成功"
-                else:
-                    # 使用官方Gemini API
-                    genai.configure(api_key=api_key)
-                    
-                    # 如果指定了模型，测试该模型
-                    if model and model.strip():
-                        try:
-                            test_model = genai.GenerativeModel(model)
-                            test_model.generate_content("test")
-                            return True, f"连接成功，模型 {model} 可用"
-                        except Exception as e:
-                            return False, f"连接成功但模型 {model} 不可用: {str(e)}"
-                    else:
-                        genai.list_models()
-                        return True, "连接成功"
-            
-            elif "sakura" in translator_key.lower():
-                # Sakura使用OpenAI兼容API
-                from openai import AsyncOpenAI
-                if not api_base:
-                    return False, "请先配置SAKURA_API_BASE"
-                client = AsyncOpenAI(
-                    api_key="sk-114514",  # Sakura使用固定密钥
-                    base_url=api_base
-                )
-                
-                # 如果指定了模型，测试该模型
-                if model and model.strip():
-                    try:
-                        await client.chat.completions.create(
-                            model=model,
-                            messages=[{"role": "user", "content": "test"}],
-                            max_tokens=5
-                        )
-                        return True, f"连接成功，模型 {model} 可用"
-                    except Exception as e:
-                        return False, f"连接成功但模型 {model} 不可用: {str(e)}"
-                else:
-                    await client.models.list()
-                    return True, "连接成功"
+                finally:
+                    await client.close()
             
             else:
                 return False, "该翻译器不支持API测试"
@@ -584,34 +605,53 @@ class MainAppLogic(QObject):
                     api_key=api_key,
                     base_url=api_base or "https://api.openai.com/v1"
                 )
-                models_response = await client.models.list()
                 
-                # 获取所有模型ID，不过滤
-                model_ids = [m.id for m in models_response.data]
-                model_ids.sort(reverse=True)  # 新模型在前
-                
-                return True, model_ids, "获取成功"
+                try:
+                    models_response = await client.models.list()
+                    
+                    # 获取所有模型ID，不过滤
+                    model_ids = [m.id for m in models_response.data]
+                    model_ids.sort(reverse=True)  # 新模型在前
+                    
+                    return True, model_ids, "获取成功"
+                finally:
+                    await client.close()
             
             elif "gemini" in translator_key.lower():
                 import google.generativeai as genai
                 
-                # 如果指定了自定义API Base，使用OpenAI兼容模式
-                if api_base and api_base != "https://generativelanguage.googleapis.com":
+                # 如果指定了自定义API Base（非空且非官方地址），使用OpenAI兼容模式
+                is_custom_api = (
+                    api_base 
+                    and api_base.strip() 
+                    and api_base.strip() not in ["https://generativelanguage.googleapis.com", "https://generativelanguage.googleapis.com/"]
+                )
+                
+                if is_custom_api:
                     from openai import AsyncOpenAI
                     client = AsyncOpenAI(
                         api_key=api_key,
-                        base_url=api_base
+                        base_url=api_base.strip()
                     )
-                    models_response = await client.models.list()
-                    model_ids = [m.id for m in models_response.data]
-                    return True, model_ids, "获取成功"
+                    try:
+                        models_response = await client.models.list()
+                        model_ids = [m.id for m in models_response.data]
+                        return True, model_ids, "获取成功"
+                    finally:
+                        await client.close()
                 else:
-                    # 使用官方Gemini API - 返回所有模型，不过滤
-                    genai.configure(api_key=api_key)
-                    models = genai.list_models()
-                    # 获取所有模型名称
-                    model_names = [m.name.replace("models/", "") for m in models]
-                    return True, model_names, "获取成功"
+                    # 使用官方Gemini API - 在线程池中执行同步调用
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    
+                    def sync_get_models():
+                        genai.configure(api_key=api_key)
+                        models = list(genai.list_models())
+                        # 获取所有模型名称
+                        model_names = [m.name.replace("models/", "") for m in models]
+                        return True, model_names, "获取成功"
+                    
+                    return await loop.run_in_executor(None, sync_get_models)
             
             elif "sakura" in translator_key.lower():
                 # Sakura使用OpenAI兼容API
@@ -622,9 +662,12 @@ class MainAppLogic(QObject):
                     api_key="sk-114514",
                     base_url=api_base
                 )
-                models_response = await client.models.list()
-                model_ids = [m.id for m in models_response.data]
-                return True, model_ids, "获取成功"
+                try:
+                    models_response = await client.models.list()
+                    model_ids = [m.id for m in models_response.data]
+                    return True, model_ids, "获取成功"
+                finally:
+                    await client.close()
             
             else:
                 return False, [], "该翻译器不支持获取模型列表"
@@ -764,7 +807,6 @@ class MainAppLogic(QObject):
                     "sakura": "Sakura",
                     "none": self._t("translator_none"),
                     "original": self._t("translator_original"),
-                    "offline": self._t("translator_offline"),
                 },
                 "target_lang": self.translation_service.get_target_languages(),
                 "labels": {
@@ -841,7 +883,6 @@ class MainAppLogic(QObject):
                     "max_requests_per_minute": self._t("label_max_requests_per_minute"),
                     "ignore_errors": self._t("label_ignore_errors"),
                     "use_gpu": self._t("label_use_gpu"),
-                    "use_gpu_limited": self._t("label_use_gpu_limited"),
                     "context_size": self._t("label_context_size"),
                     "format": self._t("label_format"),
                     "overwrite": self._t("label_overwrite"),

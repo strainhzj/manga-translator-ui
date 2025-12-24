@@ -271,8 +271,6 @@ def prepare_translator_params(config: Config, workflow: str = "normal") -> dict:
             config.cli.inpaint_only = False
         if hasattr(config.cli, 'use_gpu'):
             config.cli.use_gpu = False
-        if hasattr(config.cli, 'use_gpu_limited'):
-            config.cli.use_gpu_limited = False
         if hasattr(config.cli, 'attempts'):
             attempts = config.cli.attempts
             # -1 表示无限重试，也是有效值，不应该被忽略

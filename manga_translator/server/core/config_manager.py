@@ -57,7 +57,6 @@ DEFAULT_ADMIN_SETTINGS = {
         'cli.batch_size',
         'cli.batch_concurrent',
         'cli.use_gpu',
-        'cli.use_gpu_limited',
         'cli.verbose',
         'cli.generate_and_export',
         'cli.colorize_only',

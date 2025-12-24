@@ -431,7 +431,6 @@
 #### 翻译器设置
 
 - **翻译器**：选择翻译引擎
-  - 离线翻译器：Sugoi、NLLB、M2M100 等
   - 在线翻译器：Google Gemini、OpenAI、DeepL、百度翻译等
   - 高质量翻译器：高质量翻译 OpenAI、高质量翻译 Gemini（推荐）
 
