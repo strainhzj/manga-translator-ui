@@ -1584,9 +1584,12 @@ class EditorController(QObject):
         self.model.set_selection([new_index])
 
     def _update_undo_redo_buttons(self):
-        """更新撤销/重做按钮的启用状态"""
+        """更新撤销/重做按钮的启用状态，并检查内存限制"""
         can_undo = self.history_service.can_undo()
         can_redo = self.history_service.can_redo()
+        
+        # 限制撤销栈大小，防止内存无限增长
+        self._limit_undo_stack_memory()
         
         # 通过view更新工具栏按钮状态
         if hasattr(self, 'view'):
@@ -1594,6 +1597,26 @@ class EditorController(QObject):
                 self.view.toolbar.update_undo_redo_state(can_undo, can_redo)
         else:
             print("DEBUG: Controller has no view attribute")
+
+    def _limit_undo_stack_memory(self, max_items=50):
+        """
+        限制撤销栈的内存占用
+        由于QUndoStack默认没有限制，我们需要手动清理
+        """
+        if hasattr(self.history_service, 'undo_stack'):
+            stack = self.history_service.undo_stack
+            if stack.count() > max_items:
+                # 这是一个hack：QUndoStack没有直接删除旧命令的方法
+                # 我们只能通过设置新的limit来强制清理
+                current_limit = stack.undoLimit()
+                # 临时减小limit以触发清理
+                stack.setUndoLimit(max_items)
+                # 恢复原来的limit (或者就保持这个limit)
+                # stack.setUndoLimit(current_limit)
+                
+                # 触发垃圾回收
+                import gc
+                gc.collect()
 
     @pyqtSlot()
     def open_file_dialog_and_load(self):
@@ -1609,7 +1632,7 @@ class EditorController(QObject):
             None,
             "打开图片文件",
             last_dir,
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif)"
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.heic *.heif)"
         )
         if file_path:
             new_dir = os.path.dirname(file_path)

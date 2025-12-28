@@ -70,30 +70,57 @@ def complete_mask_fill(text_lines: List[Tuple[int, int, int, int]]):
 from pydensecrf.utils import compute_unary, unary_from_softmax
 import pydensecrf.densecrf as dcrf
 
+# 兼容不同版本的 pydensecrf
+DIAG_KERNEL = getattr(dcrf, 'DIAG_KERNEL', 0)
+NO_NORMALIZATION = getattr(dcrf, 'NO_NORMALIZATION', 0)
+
 def refine_mask(rgbimg, rawmask):
+    # Optimization: Early exit for empty or trivial masks
+    if rawmask is None or rawmask.size == 0:
+        return rawmask
+    if np.max(rawmask) == 0: # Check if mask is completely black
+        return rawmask
+        
+    # Optimization: Skip expensive CRF for very small regions (e.g. < 100 pixels)
+    # The overhead of creating DenseCRF2D outweighs the benefit for tiny spots
+    if rawmask.size < 100:
+        return rawmask
+
     if len(rawmask.shape) == 2:
         rawmask = rawmask[:, :, None]
-    mask_softmax = np.concatenate([cv2.bitwise_not(rawmask)[:, :, None], rawmask], axis=2)
-    mask_softmax = mask_softmax.astype(np.float32) / 255.0
+    
+    # 复用数组，减少内存分配
+    # Optimization: Assuming rawmask is 0 or 255. 
+    # Pre-calculating probabilities without division if possible, but modern CPUs handle this fast enough.
+    # We stick to standard float conversion but can optimize if needed.
+    mask_softmax = np.empty((rawmask.shape[0], rawmask.shape[1], 2), dtype=np.float32)
+    # Norm to 0-1
+    float_mask = rawmask[:, :, 0].astype(np.float32) / 255.0
+    mask_softmax[:, :, 0] = 1.0 - float_mask
+    mask_softmax[:, :, 1] = float_mask
+    
     n_classes = 2
-    feat_first = mask_softmax.transpose((2, 0, 1)).reshape((n_classes,-1))
+    feat_first = mask_softmax.transpose((2, 0, 1)).reshape((n_classes, -1))
     unary = unary_from_softmax(feat_first)
     unary = np.ascontiguousarray(unary)
 
     d = dcrf.DenseCRF2D(rgbimg.shape[1], rgbimg.shape[0], n_classes)
 
     d.setUnaryEnergy(unary)
-    d.addPairwiseGaussian(sxy=1, compat=3, kernel=dcrf.DIAG_KERNEL,
-                            normalization=dcrf.NO_NORMALIZATION)
+    d.addPairwiseGaussian(sxy=1, compat=3, kernel=DIAG_KERNEL,
+                            normalization=NO_NORMALIZATION)
 
     d.addPairwiseBilateral(sxy=23, srgb=7, rgbim=rgbimg,
                         compat=20,
-                        kernel=dcrf.DIAG_KERNEL,
-                        normalization=dcrf.NO_NORMALIZATION)
+                        kernel=DIAG_KERNEL,
+                        normalization=NO_NORMALIZATION)
+    
+    # Reverted to 5 steps as per user request to maintain quality.
     Q = d.inference(5)
     res = np.argmax(Q, axis=0).reshape((rgbimg.shape[0], rgbimg.shape[1]))
-    crf_mask = np.array(res * 255, dtype=np.uint8)
-    return crf_mask
+    
+    # 直接转换，避免额外复制
+    return (res * 255).astype(np.uint8)
 
 def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilateral], keep_threshold = 1e-2, dilation_offset = 0,kernel_size=3):
     bboxes = [txtln.aabb.xywh for txtln in textlines]

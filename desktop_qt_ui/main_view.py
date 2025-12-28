@@ -599,7 +599,7 @@ class MainView(QWidget):
                 widget = QLineEdit(str(value))
                 widget.editingFinished.connect(lambda k=full_key, w=widget: self._on_numeric_input_changed(w.text(), k, float if isinstance(value, float) else int))
 
-            elif value is None and key in ['tile_size', 'line_spacing', 'font_size']:
+            elif value is None and key in ['tile_size', 'line_spacing', 'font_size', 'psd_font']:
                 # 处理值为 None 的数值类型参数（Optional[int] 或 Optional[float]）
                 widget = QLineEdit("")
                 # 根据参数名设置提示文本
@@ -612,6 +612,9 @@ class MainView(QWidget):
                 elif key == 'font_size':
                     widget.setPlaceholderText(self._t("Auto"))
                     widget.editingFinished.connect(lambda k=full_key, w=widget: self._on_numeric_input_changed(w.text(), k, int))
+                elif key == 'psd_font':
+                    widget.setPlaceholderText(self._t("Photoshop Font Name (e.g. AdobeHeitiStd-Regular)"))
+                    widget.editingFinished.connect(lambda k=full_key, w=widget: self._on_setting_changed(w.text(), k, None))
 
             elif (isinstance(value, str) or value is None) and (options or display_map):
                 widget = QComboBox()
@@ -1511,8 +1514,8 @@ class MainView(QWidget):
             self, 
             self._t("Add Files"), 
             last_dir, 
-            "All Supported Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.pdf *.epub *.cbz *.cbr *.zip);;"
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif);;"
+            "All Supported Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.heic *.heif *.pdf *.epub *.cbz *.cbr *.zip);;"
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.heic *.heif);;"
             "PDF Files (*.pdf);;"
             "EPUB Files (*.epub);;"
             "Comic Book Archives (*.cbz *.cbr *.zip)"

@@ -1,6 +1,7 @@
 import os
 import re
 from typing import Dict, List, Optional
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image
@@ -81,8 +82,10 @@ class FileItemWidget(QWidget):
     """自定义列表项，用于显示缩略图、文件名和移除按钮"""
     remove_requested = pyqtSignal(str)
     
-    # 类级别的缩略图缓存
-    _thumbnail_cache: Dict[str, QPixmap] = {}
+    # MAX Cache Size
+    MAX_CACHE_SIZE = 200
+    # 类级别的缩略图缓存 (LRU)
+    _thumbnail_cache: 'OrderedDict[str, QPixmap]' = OrderedDict()
     # 类级别的信号对象（所有实例共享）
     _signals = ThumbnailSignals()
     # 存储所有活动的实例，用于分发信号
@@ -196,9 +199,20 @@ class FileItemWidget(QWidget):
         try:
             if pixmap:
                 self.thumbnail_label.setPixmap(pixmap)
-                # 缓存缩略图（只缓存一次）
-                if file_path not in FileItemWidget._thumbnail_cache:
+                
+                # 更新缓存 (LRU逻辑)
+                if file_path in FileItemWidget._thumbnail_cache:
+                    # 如果已存在，移动到末尾（标记为最近使用）
+                    FileItemWidget._thumbnail_cache.move_to_end(file_path)
+                    # 更新内容（以防万一）
                     FileItemWidget._thumbnail_cache[file_path] = pixmap
+                else:
+                    # 如果不存在，添加到末尾
+                    FileItemWidget._thumbnail_cache[file_path] = pixmap
+                    # 检查容量
+                    if len(FileItemWidget._thumbnail_cache) > FileItemWidget.MAX_CACHE_SIZE:
+                        # 移除第一个元素（最久未使用）
+                        FileItemWidget._thumbnail_cache.popitem(last=False)
             else:
                 self.thumbnail_label.setText("ERR")
         except RuntimeError:
@@ -352,7 +366,7 @@ class FileListView(QTreeWidget):
     def _scan_folder_structure(self, folder_path: str):
         """在后台线程中扫描文件夹结构（不创建UI元素）"""
         try:
-            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif'}
+            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif', '.heic', '.heif'}
             archive_extensions = {'.pdf', '.epub', '.cbz', '.cbr', '.zip'}
             all_extensions = image_extensions | archive_extensions
             structure = {'subdirs': [], 'files': [], 'subdir_data': {}}
@@ -737,7 +751,7 @@ class FileListView(QTreeWidget):
         if not os.path.isdir(folder_path):
             return 0
         try:
-            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif'}
+            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif', '.heic', '.heif'}
             archive_extensions = {'.pdf', '.epub', '.cbz', '.cbr', '.zip'}
             all_extensions = image_extensions | archive_extensions
             count = 0
@@ -756,7 +770,7 @@ class FileListView(QTreeWidget):
     def _populate_folder_tree(self, parent_item: QTreeWidgetItem, folder_path: str):
         """递归填充文件夹树形结构"""
         try:
-            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif'}
+            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif', '.heic', '.heif'}
             archive_extensions = {'.pdf', '.epub', '.cbz', '.cbr', '.zip'}
             all_extensions = image_extensions | archive_extensions
             
@@ -837,7 +851,7 @@ class FileListView(QTreeWidget):
         
         # 添加文件夹中的文件
         try:
-            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif'}
+            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif', '.heic', '.heif'}
             archive_extensions = {'.pdf', '.epub', '.cbz', '.cbr', '.zip'}
             all_extensions = image_extensions | archive_extensions
             files = [

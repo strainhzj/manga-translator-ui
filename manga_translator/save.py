@@ -1,7 +1,6 @@
 import os
 from PIL import Image
 from abc import abstractmethod
-from .rendering.gimp_render import gimp_render
 
 from .utils import Context
 
@@ -58,12 +57,6 @@ class JPGFormat(ExportFormat):
         result = result.convert('RGB')
         # Certain versions of PIL only support JPEG but not JPG
         result.save(dest, quality=ctx.save_quality, format='JPEG')
-
-class GIMPFormat(ExportFormat):
-    SUPPORTED_FORMATS = ['xcf', 'psd', 'pdf']
-
-    def _save(self, result: Image.Image, dest: str, ctx: Context):
-        gimp_render(dest, ctx)
 
 # class KraFormat(ExportFormat):
 #     SUPPORTED_FORMATS = ['kra']

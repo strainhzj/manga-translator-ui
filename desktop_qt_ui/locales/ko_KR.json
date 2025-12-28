@@ -135,6 +135,7 @@
   "label_batch_size": "배치 크기",
   "label_batch_concurrent": "동시 배치 처리",
   "label_generate_and_export": "번역 내보내기",
+  "label_export_editable_psd": "편집 가능한 PSD 내보내기",
   "label_last_output_path": "마지막 출력 경로",
   "label_save_to_source_dir": "원본 이미지 디렉토리에 저장",
   "label_line_spacing": "줄 간격",
@@ -329,7 +330,6 @@
   "Update Mask": "마스크 업데이트",
   "Copy": "복사",
   "Paste": "붙여넣기",
-  "Delete": "삭제",
   "💡 Tip: Hold Ctrl or Shift to select multiple folders": "💡 팁: Ctrl 또는 Shift를 누른 상태에서 여러 폴더 선택",
   "Name ↑": "이름 ↑",
   "Name ↓": "이름 ↓",
@@ -555,5 +555,7 @@
   "API connection test failed": "API 연결 테스트 실패",
   "Fetching models, please wait...": "모델 목록을 가져오는 중입니다. 잠시만 기다려주세요...",
   "Failed to get models": "모델 목록 가져오기 실패",
-  "No models available": "사용 가능한 모델이 없습니다"
+  "No models available": "사용 가능한 모델이 없습니다",
+  "label_psd_font": "PSD 내보내기 폰트",
+  "Photoshop Font Name (e.g. AdobeHeitiStd-Regular)": "Photoshop 폰트 이름 (PostScript 이름)"
 }

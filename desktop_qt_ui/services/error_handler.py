@@ -67,7 +67,7 @@ class InputValidator:
         result = self.validate_file_path(file_path)
         
         if result.is_valid:
-            valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.avif'}
+            valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.avif', '.heic', '.heif'}
             _, ext = os.path.splitext(file_path)
             
             if ext.lower() not in valid_extensions:

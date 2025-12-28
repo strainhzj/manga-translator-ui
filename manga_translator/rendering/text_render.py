@@ -229,6 +229,11 @@ def add_color(bw_char_map, color, stroke_char_map, stroke_color):
     else :
         x, y, w, h = cv2.boundingRect(stroke_char_map)
 
+    # 检查 boundingRect 返回的尺寸是否有效
+    if w == 0 or h == 0:
+        fg = np.zeros((bw_char_map.shape[0], bw_char_map.shape[1], 4), dtype = np.uint8)
+        return fg
+
     fg = np.zeros((h, w, 4), dtype = np.uint8)
     fg[:,:,0] = color[0]
     fg[:,:,1] = color[1]
@@ -256,10 +261,15 @@ FALLBACK_FONTS = [
 ]
 FONT_SELECTION: List[freetype.Face] = []
 font_cache = {}
+_font_file_handles = {}  # 保存文件句柄，防止被垃圾回收
+
 def get_cached_font(path: str) -> freetype.Face:
     path = path.replace('\\', '/')
     if not font_cache.get(path):
-        font_cache[path] = freetype.Face(Path(path).open('rb'))
+        # 保存文件句柄引用，防止被关闭
+        file_handle = Path(path).open('rb')
+        _font_file_handles[path] = file_handle
+        font_cache[path] = freetype.Face(file_handle)
     return font_cache[path]
 
 def update_font_selection():
@@ -361,17 +371,30 @@ def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
                 pass # Avoid logging errors within logging
 
     # If the loop completes, the character was not found in any font.
-    logger.error(f"FATAL: Character '{cdpt}' not found in any of the available fonts. Substituting with a placeholder.")
+    logger.error(f"FATAL: Character '{cdpt}' (U+{ord(cdpt):04X}) not found in any of the available fonts. Substituting with a placeholder.")
     
     # To prevent a crash, recursively call with a placeholder that is guaranteed to exist.
-    # Avoid infinite recursion if space itself is not found (highly unlikely).
-    if cdpt == ' ':
+    # Use '?' as placeholder instead of space - it's visible and indicates missing character
+    # Avoid infinite recursion if placeholder itself is not found
+    if cdpt in (' ', '?', '□'):
         # This should never happen with valid fonts, but as a safeguard:
         # We can't return a glyph, so we must raise an exception.
-        raise RuntimeError("Catastrophic failure: Space character ' ' not found in any font.")
-        
-    return get_char_glyph(' ', font_size, direction)
+        raise RuntimeError(f"Catastrophic failure: Placeholder character '{cdpt}' not found in any font.")
+    
+    # Try '?' first (visible placeholder), then '□' (replacement character), then space
+    for placeholder in ('?', '□', ' '):
+        if placeholder != cdpt:
+            try:
+                return get_char_glyph(placeholder, font_size, direction)
+            except RuntimeError:
+                continue
+    
+    # Last resort - should never reach here
+    raise RuntimeError("Catastrophic failure: No placeholder character found in any font.")
 
+# 缓存 glyph border 对象，避免重复创建导致内存泄漏
+# 注意：由于 stroke() 会修改 glyph，这里不缓存 glyph，而是直接返回新对象
+# 真正的优化在 _stroke_border_cache 中缓存最终的 bitmap 结果
 #@functools.lru_cache(maxsize = 1024, typed = True)
 def get_char_border(cdpt: str, font_size: int, direction: int):
     global FONT_SELECTION
@@ -949,7 +972,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
 
     if w == 0 or h == 0:
         logger.warning(f"[RENDER SKIPPED] Vertical text rendered with zero width or height. Width: {w}, Height: {h}, Text: {text[:50]}...")
-        return
+        return None
 
     result = line_box[y:y+h, x:x+w]
 
@@ -1506,6 +1529,11 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     line_box = add_color(canvas_text, fg, canvas_border, bg)
     combined_canvas = cv2.add(canvas_text, canvas_border)
     x, y, w, h = cv2.boundingRect(combined_canvas)
+    
+    if w == 0 or h == 0:
+        logger.warning(f"[RENDER SKIPPED] Horizontal text rendered with zero width or height. Width: {w}, Height: {h}, Text: {text[:50]}...")
+        return None
+    
     result = line_box[y:y+h, x:x+w]
     return result
 

@@ -10,6 +10,14 @@ import tqdm
 # 可通过环境变量 PIL_MAX_IMAGE_PIXELS 自定义，设为 0 表示无限制
 _max_pixels = os.environ.get('PIL_MAX_IMAGE_PIXELS', '0')
 Image.MAX_IMAGE_PIXELS = int(_max_pixels) if _max_pixels != '0' else None
+
+# 注册 HEIC/HEIF 格式支持（iPhone 默认图片格式）
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass  # pillow-heif 未安装时静默跳过
+
 import requests
 import sys
 import hashlib

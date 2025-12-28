@@ -39,8 +39,8 @@ class EditorLogic(QObject):
             None, 
             "添加文件到编辑器", 
             last_dir, 
-            "All Supported Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.pdf *.epub *.cbz *.cbr *.zip);;"
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif);;"
+            "All Supported Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.heic *.heif *.pdf *.epub *.cbz *.cbr *.zip);;"
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.webp *.avif *.heic *.heif);;"
             "PDF Files (*.pdf);;"
             "EPUB Files (*.epub);;"
             "Comic Book Archives (*.cbz *.cbr *.zip)"

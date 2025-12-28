@@ -780,7 +780,7 @@ def auto_detect_and_update_translations(
             import glob
             
             # 常见图片格式
-            image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff', '*.webp', '*.avif']
+            image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff', '*.webp', '*.avif', '*.heic', '*.heif']
             image_files = []
             
             for ext in image_extensions:

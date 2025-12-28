@@ -1771,6 +1771,29 @@ class MangaTranslator:
         
         return text_regions
 
+    def _prune_context_history(self):
+        """
+        Prune translation history to prevent memory leaks in large batch tasks.
+        Keeps only the most recent pages needed for context.
+        """
+        # Minimum history to keep (context_size + buffer)
+        # If context_size is 0, keep a small buffer (e.g., 5) just in case
+        keep_size = max(self.context_size, 1) + 5
+        
+        if len(self.all_page_translations) > keep_size:
+            # Remove oldest entries
+            trim_count = len(self.all_page_translations) - keep_size
+            self.all_page_translations = self.all_page_translations[trim_count:]
+            if len(self._original_page_texts) >= trim_count:
+                self._original_page_texts = self._original_page_texts[trim_count:]
+            # Also clean up saved image contexts if they are too old (simple heuristic)
+            if len(self._saved_image_contexts) > keep_size * 2:
+                # Keep only the last N keys
+                keys = list(self._saved_image_contexts.keys())
+                keys_to_remove = keys[:-keep_size*2]
+                for k in keys_to_remove:
+                    del self._saved_image_contexts[k]
+
     def _build_prev_context(self, use_original_text=False, current_page_index=None, batch_index=None, batch_original_texts=None):
         """
         跳过句子数为0的页面，取最近 context_size 个非空页面，拼成：
@@ -2594,7 +2617,7 @@ class MangaTranslator:
         if self.batch_concurrent and not has_incompatible_mode:
             mode_desc = "高质量翻译" if is_hq_translator else "标准翻译"
             logger.info(f'🚀 启用并发流水线模式 ({mode_desc}): {len(images_with_configs)} 张图片, 翻译批量大小: {batch_size}')
-            from .concurrent_pipeline import ConcurrentPipeline
+            from .utils.concurrent_pipeline import ConcurrentPipeline
             
             # 保存save_info供并发流水线使用
             self._current_save_info = save_info
@@ -2844,6 +2867,21 @@ class MangaTranslator:
                                 if self._save_translated_image(ctx.result, final_output_path, ctx.image_name, overwrite, "LOAD_TEXT"):
                                     # 标记成功
                                     ctx.success = True
+                                    
+                                    # 导出可编辑PSD（如果启用）
+                                    if hasattr(config, 'cli') and hasattr(config.cli, 'export_editable_psd') and config.cli.export_editable_psd:
+                                        try:
+                                            from .utils.photoshop_export import photoshop_export, get_psd_output_path
+                                            psd_path = get_psd_output_path(ctx.image_name)
+                                            render_cfg = getattr(config, 'render', None)
+                                            cli_cfg = getattr(config, 'cli', None)
+                                            default_font = getattr(cli_cfg, 'psd_font', None) or getattr(render_cfg, 'font_path', 'Arial') or 'Arial'
+                                            line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
+                                            photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing)
+                                            logger.info(f"  -> ✅ [PSD] Exported editable PSD: {os.path.basename(psd_path)}")
+                                        except Exception as psd_err:
+                                            logger.error(f"Error exporting PSD for {os.path.basename(ctx.image_name)}: {psd_err}")
+                                            
                             except Exception as save_err:
                                 logger.error(f"Error saving load_text result for {os.path.basename(ctx.image_name)}: {save_err}")
                         
@@ -2968,6 +3006,21 @@ class MangaTranslator:
                                 overwrite = save_info.get('overwrite', True)
                                 final_output_path = self._calculate_output_path(ctx.image_name, save_info)
                                 self._save_translated_image(ctx.result, final_output_path, ctx.image_name, overwrite, "BATCH")
+                                
+                                # 导出可编辑PSD（如果启用）
+                                if hasattr(config, 'cli') and hasattr(config.cli, 'export_editable_psd') and config.cli.export_editable_psd:
+                                    try:
+                                        from .utils.photoshop_export import photoshop_export, get_psd_output_path
+                                        psd_path = get_psd_output_path(ctx.image_name)
+                                        render_cfg = getattr(config, 'render', None)
+                                        cli_cfg = getattr(config, 'cli', None)
+                                        default_font = getattr(cli_cfg, 'psd_font', None) or getattr(render_cfg, 'font_path', 'Arial') or 'Arial'
+                                        line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
+                                        photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing)
+                                        logger.info(f"  -> ✅ [PSD] Exported editable PSD: {os.path.basename(psd_path)}")
+                                    except Exception as psd_err:
+                                        logger.error(f"Error exporting PSD for {os.path.basename(ctx.image_name)}: {psd_err}")
+                                        
                             except Exception as save_err:
                                 logger.error(f"Error saving standard batch result for {os.path.basename(ctx.image_name)}: {save_err}")
 
@@ -3521,6 +3574,9 @@ class MangaTranslator:
                                 page_trans[region.text] = region.translation
                         self.all_page_translations.append(page_trans)
                         logger.debug(f"[Batch Context] Saved {len(page_trans)} translations for next batch context")
+                        
+                # Prune history to prevent memory leak
+                self._prune_context_history()
                         
                 # 批次级别的目标语言检查
                 if batch and batch[0][1].translator.enable_post_translation_check:
@@ -4672,6 +4728,9 @@ class MangaTranslator:
                                 self._original_page_texts.append(page_original_texts)
                                 logger.debug(f"[HQ Batch Context] Saved {len(page_original_texts)} original texts for next batch context")
                                 
+                                # Prune history to prevent memory leak
+                                self._prune_context_history()
+                                
                 except Exception as e:
                     logger.error(f"Error in high quality batch translation: {e}")
                     # 重新抛出异常，终止翻译流程
@@ -4736,6 +4795,20 @@ class MangaTranslator:
                             overwrite = save_info.get('overwrite', True)
                             final_output_path = self._calculate_output_path(ctx.image_name, save_info)
                             self._save_translated_image(ctx.result, final_output_path, ctx.image_name, overwrite, "HQ")
+                            
+                            # 导出可编辑PSD（如果启用）
+                            if hasattr(config, 'cli') and hasattr(config.cli, 'export_editable_psd') and config.cli.export_editable_psd:
+                                try:
+                                    from .utils.photoshop_export import photoshop_export, get_psd_output_path
+                                    psd_path = get_psd_output_path(ctx.image_name)
+                                    render_cfg = getattr(config, 'render', None)
+                                    cli_cfg = getattr(config, 'cli', None)
+                                    default_font = getattr(cli_cfg, 'psd_font', None) or getattr(render_cfg, 'font_path', 'Arial') or 'Arial'
+                                    line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
+                                    photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing)
+                                    logger.info(f"  -> ✅ [PSD] Exported editable PSD: {os.path.basename(psd_path)}")
+                                except Exception as psd_err:
+                                    logger.error(f"Error exporting PSD for {os.path.basename(ctx.image_name)}: {psd_err}")
                         except Exception as save_err:
                             logger.error(f"Error saving high-quality result for {os.path.basename(ctx.image_name)}: {save_err}")
                             import traceback

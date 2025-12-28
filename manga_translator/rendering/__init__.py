@@ -1550,45 +1550,70 @@ def render(
 
     M, _ = cv2.findHomography(src_points, adjusted_dst_points[0], cv2.RANSAC, 5.0)
     
-    # OpenCV remap 限制：尺寸不能超过 SHRT_MAX (32767)
+    # 统一使用局部区域渲染，避免 OpenCV warpPerspective 的 32767 像素限制
     SHRT_MAX = 32767
-    if box.shape[0] > SHRT_MAX or box.shape[1] > SHRT_MAX or img.shape[0] > SHRT_MAX or img.shape[1] > SHRT_MAX:
-        logger.error(f"[RENDER SKIPPED] Image or box size exceeds OpenCV limit (32767). "
-                     f"box={box.shape[:2]}, img={img.shape[:2]}, text='{region.translation[:50] if hasattr(region, 'translation') else 'N/A'}...'")
+    if box.shape[0] > SHRT_MAX or box.shape[1] > SHRT_MAX:
+        logger.error(f"[RENDER SKIPPED] Text box size exceeds OpenCV limit (32767). "
+                     f"box={box.shape[:2]}, text='{region.translation[:50] if hasattr(region, 'translation') else 'N/A'}...'")
         return img
     
-    # 使用INTER_LANCZOS4获得最高质量的插值,避免字体模糊
-    rgba_region = cv2.warpPerspective(box, M, (img.shape[1], img.shape[0]), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    # 计算文字区域的边界框，添加边距
     x_adj, y_adj, w_adj, h_adj = cv2.boundingRect(np.round(adjusted_dst_points[0]).astype(np.int32))
+    margin = max(w_adj, h_adj) // 2 + 100  # 添加足够的边距
     
-    # 边界检查：确保调整后仍在图片内
-    valid_y1 = max(0, y_adj)
-    valid_y2 = min(img_h, y_adj + h_adj)
-    valid_x1 = max(0, x_adj)
-    valid_x2 = min(img_w, x_adj + w_adj)
+    # 计算局部区域边界
+    local_x1 = max(0, x_adj - margin)
+    local_y1 = max(0, y_adj - margin)
+    local_x2 = min(img_w, x_adj + w_adj + margin)
+    local_y2 = min(img_h, y_adj + h_adj + margin)
+    local_w = local_x2 - local_x1
+    local_h = local_y2 - local_y1
     
-    # 计算rgba_region中对应的区域
-    region_y1 = valid_y1
-    region_y2 = region_y1 + (valid_y2 - valid_y1)
-    region_x1 = valid_x1
-    region_x2 = region_x1 + (valid_x2 - valid_x1)
+    # 检查局部区域是否仍然超限
+    if local_w > SHRT_MAX or local_h > SHRT_MAX:
+        logger.error(f"[RENDER SKIPPED] Local region still exceeds OpenCV limit. "
+                     f"local_size=({local_w}, {local_h}), text='{region.translation[:50] if hasattr(region, 'translation') else 'N/A'}...'")
+        return img
     
-    # 检查是否有有效区域
+    # 调整目标点到局部坐标系
+    local_dst_points = adjusted_dst_points.copy()
+    local_dst_points[0, :, 0] -= local_x1
+    local_dst_points[0, :, 1] -= local_y1
+    
+    # 重新计算变换矩阵
+    M_local, _ = cv2.findHomography(src_points, local_dst_points[0], cv2.RANSAC, 5.0)
+    
+    # 在局部区域进行变换
+    rgba_region = cv2.warpPerspective(box, M_local, (local_w, local_h), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    
+    # 计算在局部区域中的有效范围
+    local_text_x = x_adj - local_x1
+    local_text_y = y_adj - local_y1
+    valid_y1 = max(0, local_text_y)
+    valid_y2 = min(local_h, local_text_y + h_adj)
+    valid_x1 = max(0, local_text_x)
+    valid_x2 = min(local_w, local_text_x + w_adj)
+    
     if valid_y2 > valid_y1 and valid_x2 > valid_x1:
-        canvas_region = rgba_region[region_y1:region_y2, region_x1:region_x2, :3]
-        mask_region = rgba_region[region_y1:region_y2, region_x1:region_x2, 3:4].astype(np.float32) / 255.0
+        canvas_region = rgba_region[valid_y1:valid_y2, valid_x1:valid_x2, :3]
+        mask_region = rgba_region[valid_y1:valid_y2, valid_x1:valid_x2, 3:4].astype(np.float32) / 255.0
         
-        # 确保尺寸匹配
-        target_region = img[valid_y1:valid_y2, valid_x1:valid_x2]
+        # 计算在原图中的对应位置
+        img_target_y1 = local_y1 + valid_y1
+        img_target_y2 = local_y1 + valid_y2
+        img_target_x1 = local_x1 + valid_x1
+        img_target_x2 = local_x1 + valid_x2
+        
+        target_region = img[img_target_y1:img_target_y2, img_target_x1:img_target_x2]
         if canvas_region.shape[:2] == target_region.shape[:2]:
-            img[valid_y1:valid_y2, valid_x1:valid_x2] = np.clip(
+            img[img_target_y1:img_target_y2, img_target_x1:img_target_x2] = np.clip(
                 (target_region.astype(np.float32) * (1 - mask_region) + canvas_region.astype(np.float32) * mask_region), 
                 0, 255
             ).astype(np.uint8)
         else:
             logger.warning(f"Text region size mismatch: canvas={canvas_region.shape[:2]}, target={target_region.shape[:2]}, skipping region")
     else:
-        logger.warning(f"Text region completely outside image bounds after adjustment: x={x_adj}, y={y_adj}, w={w_adj}, h={h_adj}, image_size=({img_w}, {img_h}). Text: '{region.translation[:50] if hasattr(region, 'translation') else 'N/A'}...'")
+        logger.warning(f"Text region completely outside image bounds: x={x_adj}, y={y_adj}, w={w_adj}, h={h_adj}, image_size=({img_w}, {img_h}). Text: '{region.translation[:50] if hasattr(region, 'translation') else 'N/A'}...'")
     
     return img
 

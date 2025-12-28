@@ -14,7 +14,7 @@ from pathlib import Path
 ARCHIVE_EXTENSIONS = {'.pdf', '.epub', '.cbz', '.cbr', '.cb7', '.zip'}
 
 # 支持的图片格式
-IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif', '.gif', '.tiff', '.tif'}
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.avif', '.gif', '.tiff', '.tif', '.heic', '.heif'}
 
 
 def is_archive_file(file_path: str) -> bool:
@@ -47,19 +47,26 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str) -> List[str]:
     os.makedirs(output_dir, exist_ok=True)
     extracted_images = []
     
-    doc = fitz.open(pdf_path)
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        # 将页面渲染为图片
-        # 使用较高的分辨率以保证质量
-        mat = fitz.Matrix(2.0, 2.0)  # 2x 缩放
-        pix = page.get_pixmap(matrix=mat)
-        
-        image_path = os.path.join(output_dir, f"page_{page_num + 1:04d}.png")
-        pix.save(image_path)
-        extracted_images.append(image_path)
+    doc = None
+    try:
+        doc = fitz.open(pdf_path)
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            # 将页面渲染为图片
+            # 使用较高的分辨率以保证质量
+            mat = fitz.Matrix(2.0, 2.0)  # 2x 缩放
+            pix = page.get_pixmap(matrix=mat)
+            
+            image_path = os.path.join(output_dir, f"page_{page_num + 1:04d}.png")
+            pix.save(image_path)
+            extracted_images.append(image_path)
+            
+            # 释放 pixmap 内存
+            pix = None
+    finally:
+        if doc is not None:
+            doc.close()
     
-    doc.close()
     return sorted(extracted_images)
 
 

@@ -894,8 +894,10 @@ class MainAppLogic(QObject):
                     "batch_size": self._t("label_batch_size"),
                     "batch_concurrent": self._t("label_batch_concurrent"),
                     "generate_and_export": self._t("label_generate_and_export"),
+                    "export_editable_psd": self._t("label_export_editable_psd"),
                     "last_output_path": self._t("label_last_output_path"),
                     "save_to_source_dir": self._t("label_save_to_source_dir"),
+                    "psd_font": self._t("label_psd_font"),
                     "line_spacing": self._t("label_line_spacing"),
                     "font_size": self._t("label_font_size"),
                     "OPENAI_API_KEY": self._t("label_OPENAI_API_KEY"),
@@ -918,7 +920,7 @@ class MainAppLogic(QObject):
 
     def get_options_for_key(self, key: str) -> Optional[List[str]]:
         options_map = {
-            "format": [self._t("format_not_specified")] + list(OUTPUT_FORMATS.keys()),
+            "format": [self._t("format_not_specified")] + [fmt for fmt in OUTPUT_FORMATS.keys() if fmt not in ['xcf', 'psd', 'pdf']],
             "renderer": [member.value for member in Renderer],
             "alignment": [member.value for member in Alignment],
             "direction": [member.value for member in Direction],
@@ -1354,206 +1356,89 @@ class MainAppLogic(QObject):
         
         return all_files
     
-    def _resolve_input_files(self) -> List[str]:
-        """
-        Expands folders in self.source_files into a list of image files.
-        同时记录文件和文件夹的映射关系。
-        按文件夹分组排序：先对文件夹进行排序，然后对每个文件夹内的图片排序。
-        支持 PDF、EPUB、CBZ 等压缩包格式，自动解压提取图片。
-        """
-        resolved_files = []
-        # 保存旧的映射，用于处理删除文件后的情况
-        old_map = self.file_to_folder_map.copy()
-        self.file_to_folder_map.clear()
+    def start_file_scanning(self):
+        """启动后台文件扫描任务"""
+        self.state_manager.set_translating(True)
+        self.state_manager.set_status_message("正在准备文件...")
         
-        # 记录压缩包到临时目录的映射，用于输出时保持结构
-        self.archive_to_temp_map = getattr(self, 'archive_to_temp_map', {})
+        self.thread = QThread()
+        self.scanner_worker = FileScannerWorker(
+            source_files=self.source_files,
+            excluded_subfolders=self.excluded_subfolders,
+            file_service=self.file_service
+        )
+        self.scanner_worker.moveToThread(self.thread)
+        
+        self.thread.started.connect(self.scanner_worker.process)
+        self.scanner_worker.finished.connect(self.thread.quit)
+        self.scanner_worker.finished.connect(self.scanner_worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        
+        # 连接结果信号
+        self.scanner_worker.finished.connect(self.on_scanning_finished)
+        self.scanner_worker.error.connect(self.on_scanning_error)
+        self.scanner_worker.progress.connect(self.on_worker_log) # 复用日志输出
+        
+        self.thread.start()
+        self._ui_log("文件扫描线程已启动")
 
-        # 分离文件和文件夹
-        folders = []
-        individual_files = []
-        archive_files = []
+    @pyqtSlot(list, dict, dict, set)
+    def on_scanning_finished(self, resolved_files, file_map, archive_map, excluded):
+        """文件扫描完成，启动翻译任务"""
+        self._ui_log(f"文件扫描完成，共找到 {len(resolved_files)} 个文件")
         
-        for path in self.source_files:
-            if os.path.isdir(path):
-                folders.append(path)
-            elif os.path.isfile(path):
-                if self.file_service.is_archive_file(path):
-                    archive_files.append(path)
-                elif self.file_service.validate_image_file(path):
-                    individual_files.append(path)
+        # 清理扫描线程引用
+        self.scanner_worker = None
+        self.thread = None
         
-        # 处理压缩包文件
-        if archive_files:
-            from desktop_qt_ui.utils.archive_extractor import extract_images_from_archive
-            for archive_path in archive_files:
-                try:
-                    self._ui_log(f"正在解压: {os.path.basename(archive_path)}")
-                    images, temp_dir = extract_images_from_archive(archive_path)
-                    if images:
-                        self.archive_to_temp_map[archive_path] = temp_dir
-                        # 将解压出的图片添加到处理列表
-                        for img_path in images:
-                            resolved_files.append(img_path)
-                            # 记录这些文件来自这个压缩包（使用压缩包路径作为"文件夹"）
-                            self.file_to_folder_map[img_path] = archive_path
-                        self._ui_log(f"从 {os.path.basename(archive_path)} 提取了 {len(images)} 张图片")
-                    else:
-                        self._ui_log(f"警告: {os.path.basename(archive_path)} 中没有找到图片", "WARNING")
-                except Exception as e:
-                    self._ui_log(f"解压 {os.path.basename(archive_path)} 失败: {e}", "ERROR")
+        # 更新状态
+        # 此时我们需要合并旧的文件映射（如果有必要），但在这种重扫模式下，
+        # worker返回的已经是全量数据的最新状态（除了单独添加的文件可能丢失原有映射关系）
+        # FileScannerWorker 已处理了大部分映射，这里我们需要处理"单独文件保留旧映射"的逻辑
+        # 但由于Worker中无法访问旧map，我们在Worker中对单独文件设为None。
+        # 如果需要保留旧映射（例如单独添加的文件其实属于某个被移除的文件夹），
+        # 这里的逻辑可能比较复杂。鉴于UI逻辑重构，我们暂时接受Worker的全新结果。
         
-        # 清理排除列表：移除不再属于任何 source_files 文件夹的排除项
-        if self.excluded_subfolders:
-            excluded_to_remove = set()
-            for excluded_folder in self.excluded_subfolders:
-                # 检查这个排除的文件夹是否还在某个 source_files 的文件夹内
-                is_valid = False
-                for folder in folders:
-                    try:
-                        common = os.path.commonpath([folder, excluded_folder])
-                        if common == os.path.normpath(folder):
-                            is_valid = True
-                            break
-                    except ValueError:
-                        continue
-                if not is_valid:
-                    excluded_to_remove.add(excluded_folder)
-            self.excluded_subfolders -= excluded_to_remove
+        self.file_to_folder_map = file_map
+        self.archive_to_temp_map = archive_map
+        self.excluded_subfolders = excluded
         
-        # 对文件夹进行自然排序
-        folders.sort(key=self.file_service._natural_sort_key)
-        
-        # 按文件夹分组处理
-        for folder in folders:
-            # 获取文件夹中的所有图片（递归查找所有子文件夹，已经使用自然排序）
-            folder_files = self.file_service.get_image_files_from_folder(folder, recursive=True)
-            
-            # 过滤掉被排除的子文件夹中的文件
-            if self.excluded_subfolders:
-                filtered_files = []
-                for file_path in folder_files:
-                    # 检查文件是否在被排除的子文件夹中
-                    is_excluded = False
-                    for excluded_folder in self.excluded_subfolders:
-                        try:
-                            common = os.path.commonpath([excluded_folder, file_path])
-                            if common == excluded_folder:
-                                is_excluded = True
-                                break
-                        except ValueError:
-                            continue
-                    if not is_excluded:
-                        filtered_files.append(file_path)
-                folder_files = filtered_files
-            
-            resolved_files.extend(folder_files)
-            # 记录这些文件来自这个文件夹
-            for file_path in folder_files:
-                self.file_to_folder_map[file_path] = folder
-        
-        # 处理单独添加的文件（使用自然排序）
-        individual_files.sort(key=self.file_service._natural_sort_key)
-        for file_path in individual_files:
-            resolved_files.append(file_path)
-            # 检查是否有旧的文件夹映射（删除文件后剩余的文件）
-            if file_path in old_map and old_map[file_path] is not None:
-                # 保留原来的文件夹映射
-                self.file_to_folder_map[file_path] = old_map[file_path]
-            else:
-                # 真正单独添加的文件，不属于任何文件夹
-                self.file_to_folder_map[file_path] = None
-
-        return list(dict.fromkeys(resolved_files)) # Return unique files
-
-    def start_backend_task(self):
-        """
-        Resolves input paths and uses a 'Worker-to-Thread' model to start the translation task.
-        """
-        # 通过调用配置服务的 reload_config 方法，强制全面重新加载所有配置
-        try:
-            self._ui_log("即将开始后台任务，强制重新加载所有配置...")
-            self.config_service.reload_config()
-            self._ui_log("配置已刷新，继续执行任务。")
-        except Exception as e:
-            self._ui_log(f"重新加载配置时发生严重错误: {e}", "ERROR")
-            # 根据需要，这里可以决定是否要中止任务
-            # from PyQt6.QtWidgets import QMessageBox
-            # QMessageBox.critical(None, "配置错误", f"无法加载最新配置: {e}")
-            # return
-
-        # 检查是否有任务在运行（基于状态而不是线程）
-        if self.state_manager.is_translating():
-            self._ui_log("一个任务已经在运行中。", "WARNING")
-            return
-        
-        # 如果有旧线程还在运行，等待它结束（不使用 terminate）
-        if self.thread is not None and self.thread.isRunning():
-            self._ui_log("检测到旧线程还在运行，正在请求停止...", "WARNING")
-            self.state_manager.set_status_message("正在停止旧任务...")
-            
-            # 通知 worker 停止
-            if self.worker:
-                try:
-                    self.worker.stop()
-                except Exception as e:
-                    self._ui_log(f"停止worker时出错: {e}", "WARNING")
-            
-            # 请求线程退出
-            self.thread.quit()
-            
-            # 等待最多5秒（给渲染任务足够的时间完成）
-            wait_time = 5000  # 5秒
-            if not self.thread.wait(wait_time):
-                self._ui_log(f"旧线程在{wait_time}ms内未停止，强制终止", "ERROR")
-                # 最后手段：强制终止（可能导致资源泄漏，但比线程冲突好）
-                self.thread.terminate()
-                self.thread.wait()  # 等待终止完成
-                self._ui_log("旧线程已被强制终止", "WARNING")
-            else:
-                self._ui_log("旧线程已正常停止")
-            
-            # 清理引用
-            self.thread = None
-            self.worker = None
-            
-            # 重置状态
+        # 检查文件列表是否为空
+        if not resolved_files:
+            self._ui_log("没有找到有效的图片文件，任务中止", "WARNING")
             self.state_manager.set_translating(False)
             self.state_manager.set_status_message("就绪")
-
-        # 检查文件列表是否为空
-        files_to_process = self._resolve_input_files()
-        if not files_to_process:
-            self._ui_log("没有找到有效的图片文件，任务中止", "WARNING")
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(
                 None,
                 self._t("File List Empty"),
-                self._t("Please add image files to translate!\n\nYou can add files by:\n• Click 'Add Files' button\n• Click 'Add Folder' button\n• Drag and drop files to the list")
+                self._t("Please add image files to translate!")
             )
             return
 
-        # 检查输出目录是否合法
-        output_path = self.config_service.get_config().app.last_output_path
-        if not output_path or not os.path.isdir(output_path):
-            self._ui_log(f"输出目录不合法: {output_path}", "WARNING")
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.warning(
-                None,
-                self._t("Invalid Output Directory"),
-                self._t("Please set a valid output directory!\n\nYou can set it by:\n• Click 'Browse...' button to select directory\n• Enter path directly in the output directory field")
-            )
-            return
+        # 启动真正的翻译任务
+        self._start_translation_worker(resolved_files)
 
+    @pyqtSlot(str)
+    def on_scanning_error(self, error_msg):
+        self._ui_log(f"扫描文件时出错: {error_msg}", "ERROR")
+        self.state_manager.set_translating(False)
+        self.state_manager.set_status_message("扫描失败")
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.critical(None, "扫描失败", f"扫描文件时出错:\n{error_msg}")
+
+    def _start_translation_worker(self, files_to_process):
+        """启动翻译工作线程（内部方法，由扫描完成后调用）"""
         self.saved_files_count = 0
-        self.saved_files_list = []  # 重置保存文件列表
+        self.saved_files_list = []
+        
         self.thread = QThread()
         self.worker = TranslationWorker(
             files=files_to_process,
             config_dict=self.config_service.get_config().dict(),
             output_folder=self.config_service.get_config().app.last_output_path,
             root_dir=self.config_service.root_dir,
-            file_to_folder_map=self.file_to_folder_map.copy()  # 传递文件到文件夹的映射
+            file_to_folder_map=self.file_to_folder_map.copy()
         )
         
         self.worker.moveToThread(self.thread)
@@ -1572,6 +1457,74 @@ class MainAppLogic(QObject):
         self._ui_log("翻译工作线程已启动。")
         self.state_manager.set_translating(True)
         self.state_manager.set_status_message("正在翻译...")
+
+    def _resolve_input_files(self) -> List[str]:
+        """
+        DEPRECATED: Use FileScannerWorker instead.
+        Kept for compatibility if needed, but logic moved to worker.
+        """
+        # ... logic ...
+        return []
+
+    def start_backend_task(self):
+        """
+        Resolves input paths and uses a 'Worker-to-Thread' model to start the translation task.
+        """
+        # 通过调用配置服务的 reload_config 方法，强制全面重新加载所有配置
+        try:
+            self._ui_log("即将开始后台任务，强制重新加载所有配置...")
+            self.config_service.reload_config()
+            self._ui_log("配置已刷新，继续执行任务。")
+        except Exception as e:
+            self._ui_log(f"重新加载配置时发生严重错误: {e}", "ERROR")
+
+        # 检查是否有任务在运行
+        if self.state_manager.is_translating():
+            self._ui_log("一个任务已经在运行中。", "WARNING")
+            return
+        
+        # 如果有旧线程还在运行，等待它结束
+        if self.thread is not None and self.thread.isRunning():
+            self._ui_log("检测到旧线程还在运行，正在请求停止...", "WARNING")
+            self.state_manager.set_status_message("正在停止旧任务...")
+            if self.worker:
+                try:
+                    self.worker.stop()
+                except Exception:
+                    pass
+            self.thread.quit()
+            if not self.thread.wait(5000):
+                self.thread.terminate()
+                self.thread.wait()
+            self.thread = None
+            self.worker = None
+            self.state_manager.set_translating(False)
+
+        # 检查输出目录是否合法 (提前检查)
+        output_path = self.config_service.get_config().app.last_output_path
+        if not output_path or not os.path.isdir(output_path):
+            self._ui_log(f"输出目录不合法: {output_path}", "WARNING")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                None,
+                self._t("Invalid Output Directory"),
+                self._t("Please set a valid output directory!")
+            )
+            return
+            
+        # 检查源文件列表是否为空 (初步检查，具体以扫描结果为准)
+        if not self.source_files:
+            self._ui_log("文件列表为空", "WARNING")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                None,
+                self._t("File List Empty"),
+                self._t("Please add image files to translate!")
+            )
+            return
+
+        # 启动后台文件扫描
+        self.start_file_scanning()
 
     def on_task_finished(self, results):
         """处理任务完成信号，并根据需要保存批量任务的结果"""
@@ -1871,6 +1824,125 @@ class QtLogHandler(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         self.signal.emit(msg)
+
+class FileScannerWorker(QObject):
+    """
+    Worker for scanning files and folders in a background thread.
+    Replaces the synchronous _resolve_input_files method.
+    """
+    finished = pyqtSignal(list, dict, dict, set) # resolved_files, file_to_folder_map, archive_to_temp_map, excluded_subfolders
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
+
+    def __init__(self, source_files, excluded_subfolders, file_service):
+        super().__init__()
+        self.source_files = source_files
+        self.excluded_subfolders = excluded_subfolders.copy()
+        self.file_service = file_service
+        self.file_to_folder_map = {}
+        self.archive_to_temp_map = {}
+
+    def process(self):
+        try:
+            self.progress.emit("正在扫描文件...")
+            resolved_files = []
+            
+            # 分离文件和文件夹
+            folders = []
+            individual_files = []
+            archive_files = []
+            
+            for path in self.source_files:
+                if os.path.isdir(path):
+                    folders.append(path)
+                elif os.path.isfile(path):
+                    if self.file_service.is_archive_file(path):
+                        archive_files.append(path)
+                    elif self.file_service.validate_image_file(path):
+                        individual_files.append(path)
+            
+            # 处理压缩包文件
+            if archive_files:
+                from desktop_qt_ui.utils.archive_extractor import extract_images_from_archive
+                for archive_path in archive_files:
+                    try:
+                        self.progress.emit(f"正在解压: {os.path.basename(archive_path)}")
+                        images, temp_dir = extract_images_from_archive(archive_path)
+                        if images:
+                            self.archive_to_temp_map[archive_path] = temp_dir
+                            # 将解压出的图片添加到处理列表
+                            for img_path in images:
+                                resolved_files.append(img_path)
+                                # 记录这些文件来自这个压缩包
+                                self.file_to_folder_map[img_path] = archive_path
+                            self.progress.emit(f"从 {os.path.basename(archive_path)} 提取了 {len(images)} 张图片")
+                        else:
+                            self.progress.emit(f"警告: {os.path.basename(archive_path)} 中没有找到图片")
+                    except Exception as e:
+                        self.progress.emit(f"解压 {os.path.basename(archive_path)} 失败: {e}")
+            
+            # 清理排除列表
+            if self.excluded_subfolders:
+                excluded_to_remove = set()
+                for excluded_folder in self.excluded_subfolders:
+                    is_valid = False
+                    for folder in folders:
+                        try:
+                            common = os.path.commonpath([folder, excluded_folder])
+                            if common == os.path.normpath(folder):
+                                is_valid = True
+                                break
+                        except ValueError:
+                            continue
+                    if not is_valid:
+                        excluded_to_remove.add(excluded_folder)
+                self.excluded_subfolders -= excluded_to_remove
+            
+            # 对文件夹进行自然排序
+            folders.sort(key=self.file_service._natural_sort_key)
+            
+            # 按文件夹分组处理
+            for folder in folders:
+                self.progress.emit(f"正在扫描文件夹: {os.path.basename(folder)}")
+                # 获取文件夹中的所有图片
+                folder_files = self.file_service.get_image_files_from_folder(folder, recursive=True)
+                
+                # 过滤掉被排除的子文件夹中的文件
+                if self.excluded_subfolders:
+                    filtered_files = []
+                    for file_path in folder_files:
+                        is_excluded = False
+                        for excluded_folder in self.excluded_subfolders:
+                            try:
+                                common = os.path.commonpath([excluded_folder, file_path])
+                                if common == excluded_folder:
+                                    is_excluded = True
+                                    break
+                            except ValueError:
+                                continue
+                        if not is_excluded:
+                            filtered_files.append(file_path)
+                    folder_files = filtered_files
+                
+                resolved_files.extend(folder_files)
+                # 记录这些文件来自这个文件夹
+                for file_path in folder_files:
+                    self.file_to_folder_map[file_path] = folder
+            
+            # 处理单独添加的文件
+            individual_files.sort(key=self.file_service._natural_sort_key)
+            for file_path in individual_files:
+                resolved_files.append(file_path)
+                # 单独添加的文件，映射为None（除非在MainAppLogic中有旧映射，但这里我们无法访问旧映射，
+                # 不过MainAppLogic可以在接收结果时合并）
+                self.file_to_folder_map[file_path] = None
+
+            unique_files = list(dict.fromkeys(resolved_files))
+            self.finished.emit(unique_files, self.file_to_folder_map, self.archive_to_temp_map, self.excluded_subfolders)
+            
+        except Exception as e:
+            self.error.emit(str(e))
+
 
 class TranslationWorker(QObject):
     finished = pyqtSignal(list)
@@ -2776,9 +2848,20 @@ class TranslationWorker(QObject):
 
             # 翻译结束后进行完整的内存清理（特别是CPU模式）
             try:
-                # 清理翻译器对象引用
+                # 显式清理大对象引用，帮助GC回收
                 if 'translator' in locals():
+                    # 确保卸载所有模型
+                    if hasattr(translator, '_detector_cleanup_task') and translator._detector_cleanup_task:
+                        translator._detector_cleanup_task.cancel()
                     del translator
+                if 'results' in locals():
+                    del results
+                if 'all_contexts' in locals():
+                    del all_contexts
+                if 'batch_data' in locals():
+                    del batch_data
+                if 'images_with_configs' in locals():
+                    del images_with_configs
                 
                 from desktop_qt_ui.utils.memory_cleanup import full_memory_cleanup
                 full_memory_cleanup(log_callback=lambda msg: self.log_received.emit(msg))

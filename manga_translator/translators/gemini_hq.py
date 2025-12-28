@@ -155,13 +155,13 @@ class GeminiHighQualityTranslator(CommonTranslator):
         need_rebuild_client = False
         
         user_api_key = getattr(args, 'user_api_key', None)
-        if user_api_key:
+        if user_api_key and user_api_key != self.api_key:
             self.api_key = user_api_key
             need_rebuild_client = True
             self.logger.info("[UserAPIKey] Using user-provided API key for Gemini HQ")
         
         user_api_base = getattr(args, 'user_api_base', None)
-        if user_api_base:
+        if user_api_base and user_api_base != self.base_url:
             self.base_url = user_api_base
             need_rebuild_client = True
             self.logger.info(f"[UserAPIKey] Using user-provided API base: {user_api_base}")

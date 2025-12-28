@@ -135,6 +135,7 @@
   "label_batch_size": "Tamaño de lote",
   "label_batch_concurrent": "Procesamiento de lotes concurrente",
   "label_generate_and_export": "Exportar traducción",
+  "label_export_editable_psd": "Exportar PSD editable",
   "label_last_output_path": "Última ruta de salida",
   "label_save_to_source_dir": "Guardar en directorio de origen",
   "label_line_spacing": "Espaciado de línea",
@@ -329,7 +330,6 @@
   "Update Mask": "Actualizar máscara",
   "Copy": "Copiar",
   "Paste": "Pegar",
-  "Delete": "Eliminar",
   "💡 Tip: Hold Ctrl or Shift to select multiple folders": "💡 Consejo: Mantenga presionado Ctrl o Shift para seleccionar múltiples carpetas",
   "Name ↑": "Nombre ↑",
   "Name ↓": "Nombre ↓",
@@ -555,5 +555,7 @@
   "API connection test failed": "Prueba de conexión API fallida",
   "Fetching models, please wait...": "Obteniendo lista de modelos, por favor espere...",
   "Failed to get models": "Error al obtener lista de modelos",
-  "No models available": "No hay modelos disponibles"
+  "No models available": "No hay modelos disponibles",
+  "label_psd_font": "Fuente de exportación PSD",
+  "Photoshop Font Name (e.g. AdobeHeitiStd-Regular)": "Nombre de fuente de Photoshop (Nombre PostScript)"
 }

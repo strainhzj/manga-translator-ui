@@ -384,6 +384,10 @@ class CliConfig(BaseModel):
     """Save extracted text"""
     ignore_errors: bool = False
     """Ignore errors and continue processing"""
+    export_editable_psd: bool = False
+    """Export editable PSD file with layers (requires Photoshop)"""
+    psd_font: Optional[str] = None
+    """Font name for PSD export (PostScript name, e.g. ArialMT, SimHei). If not set, uses default font."""
 
 class OcrConfig(BaseModel):
     use_mocr_merge: bool = False

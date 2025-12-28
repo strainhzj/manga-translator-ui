@@ -135,6 +135,7 @@
   "label_batch_size": "バッチサイズ",
   "label_batch_concurrent": "並行バッチ処理",
   "label_generate_and_export": "翻訳をエクスポート",
+  "label_export_editable_psd": "編集可能なPSDをエクスポート",
   "label_last_output_path": "最後の出力パス",
   "label_save_to_source_dir": "元画像のディレクトリに保存",
   "label_line_spacing": "行間",
@@ -329,7 +330,6 @@
   "Update Mask": "マスクを更新",
   "Copy": "コピー",
   "Paste": "貼り付け",
-  "Delete": "削除",
   "💡 Tip: Hold Ctrl or Shift to select multiple folders": "💡 ヒント：CtrlまたはShiftを押しながら複数のフォルダを選択",
   "Name ↑": "名前 ↑",
   "Name ↓": "名前 ↓",
@@ -552,5 +552,7 @@
   "API connection test failed": "API接続テスト失敗",
   "Fetching models, please wait...": "モデルリストを取得中、お待ちください...",
   "Failed to get models": "モデルリストの取得に失敗しました",
-  "No models available": "利用可能なモデルがありません"
+  "No models available": "利用可能なモデルがありません",
+  "label_psd_font": "PSD出力フォント",
+  "Photoshop Font Name (e.g. AdobeHeitiStd-Regular)": "Photoshopフォント名 (PostScript名, 例: AdobeHeitiStd-Regular)"
 }
