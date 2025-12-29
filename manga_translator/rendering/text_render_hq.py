@@ -38,7 +38,8 @@ def render_text_with_upscale(
     # 横排专用参数
     reversed_direction: bool = False,
     target_lang: str = 'en_US',
-    hyphenate: bool = True
+    hyphenate: bool = True,
+    stroke_width: float = None
 ) -> np.ndarray:
     """
     使用放大渲染+缩小技术，提高低分辨率下的文本质量
@@ -69,12 +70,12 @@ def render_text_with_upscale(
             return text_render.put_text_horizontal(
                 font_size, text, width, height, alignment,
                 reversed_direction, fg, bg, target_lang, hyphenate, 
-                line_spacing, config, region_count
+                line_spacing, config, region_count, stroke_width
             )
         else:
             return text_render.put_text_vertical(
                 font_size, text, height, alignment, fg, bg, 
-                line_spacing, config, region_count
+                line_spacing, config, region_count, stroke_width
             )
     
     logger.debug(f"[HQ_RENDER] 使用 {upscale_factor}x 放大渲染 (原始字号={font_size})")
@@ -100,7 +101,8 @@ def render_text_with_upscale(
                 hyphenate,
                 line_spacing,
                 config,
-                region_count
+                region_count,
+                stroke_width
             )
         else:
             upscaled_canvas = text_render.put_text_vertical(
@@ -112,7 +114,8 @@ def render_text_with_upscale(
                 bg,
                 line_spacing,
                 config,
-                region_count
+                region_count,
+                stroke_width
             )
     except Exception as e:
         logger.error(f"[HQ_RENDER] 放大渲染失败: {e}，回退到普通渲染")
@@ -121,12 +124,12 @@ def render_text_with_upscale(
             return text_render.put_text_horizontal(
                 font_size, text, width, height, alignment,
                 reversed_direction, fg, bg, target_lang, hyphenate,
-                line_spacing, config, region_count
+                line_spacing, config, region_count, stroke_width
             )
         else:
             return text_render.put_text_vertical(
                 font_size, text, height, alignment, fg, bg,
-                line_spacing, config, region_count
+                line_spacing, config, region_count, stroke_width
             )
     
     if upscaled_canvas is None:

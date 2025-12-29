@@ -346,7 +346,7 @@ def optimize_line_breaks_for_region(region: TextBlock, config: Config, target_fo
                     language=region.target_lang
                 )
                 if widths:
-                    spacing_y = int(target_font_size * (config.render.line_spacing or 0.01))
+                    spacing_y = int(target_font_size * 0.01 * (config.render.line_spacing or 1.0))
                     required_width = max(widths)
                     required_height = target_font_size * len(lines) + spacing_y * max(0, len(lines) - 1)
                 else:
@@ -357,7 +357,7 @@ def optimize_line_breaks_for_region(region: TextBlock, config: Config, target_fo
                 
                 lines, heights = text_render.calc_vertical(target_font_size, text_for_calc, max_height=99999)
                 if heights:
-                    spacing_x = int(target_font_size * (config.render.line_spacing or 0.2))
+                    spacing_x = int(target_font_size * 0.2 * (config.render.line_spacing or 1.0))
                     required_height = max(heights)
                     required_width = target_font_size * len(lines) + spacing_x * max(0, len(lines) - 1)
                 else:
@@ -538,10 +538,11 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         text_for_calc, 
                         max_width=max_width_for_calc, 
                         max_height=max_height_for_calc, 
+
                         language=region.target_lang
                     )
                     if widths:
-                        spacing_y = int(target_font_size * (config.render.line_spacing or 0.01))
+                        spacing_y = int(target_font_size * 0.01 * (config.render.line_spacing or 1.0))
                         required_width = max(widths)
                         required_height = target_font_size * len(lines) + spacing_y * max(0, len(lines) - 1)
                 else:
@@ -558,7 +559,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         max_height=max_height_for_calc
                     )
                     if heights:
-                        spacing_x = int(target_font_size * (config.render.line_spacing or 0.2))
+                        spacing_x = int(target_font_size * 0.2 * (config.render.line_spacing or 1.0))
                         required_height = max(heights)
                         required_width = target_font_size * len(lines) + spacing_x * max(0, len(lines) - 1)
                 
@@ -1248,7 +1249,11 @@ async def dispatch(
         # 保存缩放算法计算的 dst_points 到 region，供 PSD 导出使用
         # 注意：这是缩放后的真实文本区域，不是 render 函数中扩展后的区域
         region.dst_points = dst_points
-        img = render(img, region, dst_points, not config.render.no_hyphenation, config.render.line_spacing, config.render.disable_font_border, config)
+        # 行间距 = 基础值 * 倍率：横排基础 0.01，竖排基础 0.2
+        line_spacing_multiplier = getattr(region, 'line_spacing', 1.0)
+        base_spacing = 0.01 if region.horizontal else 0.2
+        line_spacing = base_spacing * line_spacing_multiplier
+        img = render(img, region, dst_points, not config.render.no_hyphenation, line_spacing, config.render.disable_font_border, config)
     
     if return_debug_img and debug_img is not None:
         return img, debug_img
@@ -1337,7 +1342,10 @@ def render(
     elif not isinstance(fg, (tuple, list)):
         fg = (0, 0, 0) # Default to black if format is unexpected
 
-    fg, bg = fg_bg_compare(fg, bg)
+    # 只有在用户没有明确设置描边颜色（adjust_bg_color=True）时才进行颜色自动调整
+    # 如果用户明确设置了 stroke_color_type，则 adjust_bg_color=False，跳过自动调整
+    if getattr(region, 'adjust_bg_color', True):
+        fg, bg = fg_bg_compare(fg, bg)
 
     # Centralized text preprocessing
     # 检查是否有富文本，并标记给渲染器
@@ -1430,7 +1438,8 @@ def render(
             # 横排专用参数
             reversed_direction=(region.direction == 'hl'),
             target_lang=region.target_lang,
-            hyphenate=hyphenate
+            hyphenate=hyphenate,
+            stroke_width=region.stroke_width  # 传递区域的描边宽度
         )
     elif render_horizontally:
         temp_box = text_render.put_text_horizontal(
@@ -1446,7 +1455,8 @@ def render(
             hyphenate,
             line_spacing,
             config,
-            len(region.lines)  # Pass region count
+            len(region.lines),  # Pass region count
+            stroke_width=region.stroke_width  # 传递区域的描边宽度
         )
     else:
         temp_box = text_render.put_text_vertical(
@@ -1458,7 +1468,8 @@ def render(
             bg,
             line_spacing,
             config,
-            len(region.lines)  # Pass region count
+            len(region.lines),  # Pass region count
+            stroke_width=region.stroke_width  # 传递区域的描边宽度
         )
     
     if temp_box is None:
@@ -1519,34 +1530,53 @@ def render(
 
     src_points = np.array([[0, 0], [box.shape[1], 0], [box.shape[1], box.shape[0]], [0, box.shape[0]]]).astype(np.float32)
 
-    # 智能边界调整：检查文本是否超出图片边界，如果超出则平移到图片内
+    # 智能边界调整：检查文本是否超出图片边界
     img_h, img_w = img.shape[:2]
     x, y, w, h = cv2.boundingRect(np.round(dst_points[0]).astype(np.int32))
     
     adjusted = False
-    offset_x, offset_y = 0, 0
-    
-    # 检查并计算需要的偏移
-    if y < 0:
-        offset_y = -y
-        adjusted = True
-    elif y + h > img_h:
-        offset_y = img_h - (y + h)
-        adjusted = True
-    
-    if x < 0:
-        offset_x = -x
-        adjusted = True
-    elif x + w > img_w:
-        offset_x = img_w - (x + w)
-        adjusted = True
-    
-    # 应用偏移到目标点
     adjusted_dst_points = dst_points.copy()
+    
+    # 获取四个角点的坐标
+    pts = adjusted_dst_points[0].copy()  # shape: (4, 2)
+    
+    # 检查每个边是否超出，超出则缩回来
+    # 左边超出
+    min_x = pts[:, 0].min()
+    if min_x < 0:
+        # 把所有超出左边界的点拉回到0
+        pts[:, 0] = np.maximum(pts[:, 0], 0)
+        adjusted = True
+        logger.info(f"Left edge exceeded, clipped from {min_x:.1f} to 0")
+    
+    # 右边超出
+    max_x = pts[:, 0].max()
+    if max_x > img_w:
+        # 把所有超出右边界的点拉回到img_w
+        pts[:, 0] = np.minimum(pts[:, 0], img_w)
+        adjusted = True
+        logger.info(f"Right edge exceeded, clipped from {max_x:.1f} to {img_w}")
+    
+    # 上边超出
+    min_y = pts[:, 1].min()
+    if min_y < 0:
+        # 把所有超出上边界的点拉回到0
+        pts[:, 1] = np.maximum(pts[:, 1], 0)
+        adjusted = True
+        logger.info(f"Top edge exceeded, clipped from {min_y:.1f} to 0")
+    
+    # 下边超出
+    max_y = pts[:, 1].max()
+    if max_y > img_h:
+        # 把所有超出下边界的点拉回到img_h
+        pts[:, 1] = np.minimum(pts[:, 1], img_h)
+        adjusted = True
+        logger.info(f"Bottom edge exceeded, clipped from {max_y:.1f} to {img_h}")
+    
     if adjusted:
-        adjusted_dst_points[0, :, 0] += offset_x
-        adjusted_dst_points[0, :, 1] += offset_y
-        logger.info(f"Adjusted text position to fit within image: offset=({offset_x}, {offset_y}), original_bbox=({x}, {y}, {w}, {h})")
+        adjusted_dst_points[0] = pts
+        new_x, new_y, new_w, new_h = cv2.boundingRect(np.round(pts).astype(np.int32))
+        logger.info(f"Text box adjusted to fit image: ({x}, {y}, {w}, {h}) -> ({new_x}, {new_y}, {new_w}, {new_h})")
 
     M, _ = cv2.findHomography(src_points, adjusted_dst_points[0], cv2.RANSAC, 5.0)
     

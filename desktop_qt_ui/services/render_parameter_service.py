@@ -211,7 +211,12 @@ class RenderParameterService:
             params.font_size = font_size
             params.alignment = alignment
             params.direction = direction
-            # 使用现有的stroke_width，不覆盖
+            
+            # 从 region_data 读取描边宽度（优先 stroke_width，兼容 default_stroke_width）
+            stroke_width_val = region_data.get('stroke_width') or region_data.get('default_stroke_width')
+            if stroke_width_val is not None:
+                params.stroke_width = stroke_width_val
+            
             # 注意：不覆盖line_spacing，使用配置服务的值
             
             self.logger.debug(f"计算默认参数: 尺寸={width}x{height}, 字体={font_size}, 方向={direction}")
@@ -260,6 +265,28 @@ class RenderParameterService:
                 elif 'fg_colors' in region_data and region_data['fg_colors']:
                     params.fg_color = tuple(region_data['fg_colors'])
 
+                # 描边颜色 - 优先使用 stroke_color_type
+                stroke_color_type = region_data.get('stroke_color_type')
+                if stroke_color_type:
+                    # 根据 stroke_color_type 设置 bg_colors
+                    if stroke_color_type == "white":
+                        params.bg_color = (255, 255, 255)
+                    else:  # black
+                        params.bg_color = (0, 0, 0)
+                elif 'bg_colors' in region_data and region_data['bg_colors']:
+                    params.bg_color = tuple(region_data['bg_colors'])
+                elif 'bg_color' in region_data and region_data['bg_color']:
+                    params.bg_color = tuple(region_data['bg_color'])
+
+                # 描边宽度 - 优先读取 stroke_width，兼容旧的 default_stroke_width
+                stroke_width_val = region_data.get('stroke_width') or region_data.get('default_stroke_width')
+                if stroke_width_val is not None:
+                    params.stroke_width = stroke_width_val
+
+                # 行间距 - 读取 line_spacing
+                if 'line_spacing' in region_data and region_data['line_spacing'] is not None:
+                    params.line_spacing = region_data['line_spacing']
+
                 # 字体样式
                 if 'bold' in region_data:
                     params.bold = region_data['bold']
@@ -288,8 +315,12 @@ class RenderParameterService:
         # 如果有区域数据，基于它计算参数
         if region_data:
             calculated_params = self.calculate_default_parameters(region_data)
-            # 只覆盖计算出的特定参数，保留配置服务的其他参数
-            calculated_params.line_spacing = default_params.line_spacing
+            
+            # 从 region_data 中读取 line_spacing（倍率），如果没有则使用配置的默认值
+            if 'line_spacing' in region_data and region_data['line_spacing'] is not None:
+                calculated_params.line_spacing = region_data['line_spacing']
+            else:
+                calculated_params.line_spacing = default_params.line_spacing
 
             # 从 region_data 中读取用户设置的字段
             # 字体大小
@@ -317,6 +348,24 @@ class RenderParameterService:
                         pass
             elif 'fg_colors' in region_data and region_data['fg_colors']:
                 calculated_params.fg_color = tuple(region_data['fg_colors'])
+
+            # 描边颜色 - 优先使用 stroke_color_type
+            stroke_color_type = region_data.get('stroke_color_type')
+            if stroke_color_type:
+                # 根据 stroke_color_type 设置 bg_colors
+                if stroke_color_type == "white":
+                    calculated_params.bg_color = (255, 255, 255)
+                else:  # black
+                    calculated_params.bg_color = (0, 0, 0)
+            elif 'bg_colors' in region_data and region_data['bg_colors']:
+                calculated_params.bg_color = tuple(region_data['bg_colors'])
+            elif 'bg_color' in region_data and region_data['bg_color']:
+                calculated_params.bg_color = tuple(region_data['bg_color'])
+
+            # 描边宽度 - 优先读取 stroke_width，兼容旧的 default_stroke_width
+            stroke_width_val = region_data.get('stroke_width') or region_data.get('default_stroke_width')
+            if stroke_width_val is not None:
+                calculated_params.stroke_width = stroke_width_val
 
             # 字体样式
             if 'bold' in region_data:
@@ -406,7 +455,6 @@ class RenderParameterService:
             
             # 颜色参数
             'font_color': f"#{params.fg_color[0]:02x}{params.fg_color[1]:02x}{params.fg_color[2]:02x}" if isinstance(params.fg_color, (list, tuple)) and len(params.fg_color) == 3 else params.fg_color,
-            'text_stroke_color': params.bg_color, # Renamed from bg_color
             'opacity': params.opacity,
             
             # 布局参数
@@ -417,7 +465,8 @@ class RenderParameterService:
             'letter_spacing': params.letter_spacing,
             
             # 效果参数
-            'text_stroke_width': params.stroke_width, # Renamed from stroke_width
+            'stroke_width': params.stroke_width,  # 统一使用 stroke_width（后端会转换为 default_stroke_width）
+            'text_stroke_width': params.stroke_width,  # text_renderer_backend 期望的参数名
             'shadow_radius': params.shadow_radius,
             'shadow_strength': params.shadow_strength,
             'shadow_color': params.shadow_color,
@@ -440,6 +489,34 @@ class RenderParameterService:
             '_generated_by': 'desktop-ui'
         }
         
+        # 处理描边颜色
+        # 如果有 stroke_color_type，传递给后端并设置对应的 bg_color
+        stroke_color_type = region_data.get('stroke_color_type') if region_data else None
+        
+        if stroke_color_type:
+            # 用户在编辑器中设置了描边颜色类型
+            backend_params['stroke_color_type'] = stroke_color_type
+            if stroke_color_type == "white":
+                backend_params['bg_color'] = (255, 255, 255)
+                backend_params['text_stroke_color'] = (255, 255, 255)
+            else:  # black
+                backend_params['bg_color'] = (0, 0, 0)
+                backend_params['text_stroke_color'] = (0, 0, 0)
+            backend_params['adjust_bg_color'] = False
+        else:
+            # 没有设置 stroke_color_type 时，使用 params.bg_color 作为描边颜色
+            backend_params['text_stroke_color'] = params.bg_color
+        
+        # 覆盖 line_spacing 和 stroke_width（如果 region_data 中有的话）
+        if region_data:
+            if 'line_spacing' in region_data:
+                backend_params['line_spacing'] = region_data['line_spacing']
+            # 优先使用 stroke_width，兼容旧的 default_stroke_width
+            stroke_width_val = region_data.get('stroke_width') or region_data.get('default_stroke_width')
+            if stroke_width_val is not None:
+                backend_params['default_stroke_width'] = stroke_width_val
+                backend_params['text_stroke_width'] = stroke_width_val
+        
         return backend_params
     
     def import_parameters_from_json(self, region_index: int, json_data: Dict[str, Any]):
@@ -450,10 +527,6 @@ class RenderParameterService:
             param_fields = RenderParameters.__dataclass_fields__.keys()
             
             for key, value in json_data.items():
-                # 跳过某些参数，使用UI配置的值
-                if key in ['line_spacing']:
-                    continue
-
                 # 特殊处理颜色键名的不一致 (JSON是复数, dataclass是单数)
                 if key == 'fg_colors':
                     key = 'fg_color'

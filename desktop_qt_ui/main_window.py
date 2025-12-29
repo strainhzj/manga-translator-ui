@@ -369,13 +369,18 @@ class MainWindow(QMainWindow):
                 return
 
             self.logger.info("About to show QMessageBox")
-            reply = QMessageBox.question(
-                self, 
-                self._t('Task Completed'), 
-                self._t("Translation completed, {count} files saved.\n\nOpen results in editor?", count=len(saved_files)),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
+            
+            # 创建自定义消息框，避免图片过多导致闪退
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle(self._t('Task Completed'))
+            msg_box.setText(self._t("Translation completed, {count} files saved.\n\nOpen results in editor?", count=len(saved_files)))
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+            
+            # 不设置图标，避免加载过多资源
+            msg_box.setIcon(QMessageBox.Icon.Question)
+            
+            reply = msg_box.exec()
 
             if reply == QMessageBox.StandardButton.Yes:
                 self.enter_editor_mode(files_to_load=saved_files)

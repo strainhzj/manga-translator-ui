@@ -58,6 +58,7 @@ DEFAULT_ADMIN_SETTINGS = {
         'cli.batch_concurrent',
         'cli.use_gpu',
         'cli.verbose',
+        'cli.psd_script_only',  # Web UI隐藏PSD脚本模式参数
         'cli.generate_and_export',
         'cli.colorize_only',
         'cli.upscale_only',

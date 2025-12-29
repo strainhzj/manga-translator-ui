@@ -78,6 +78,13 @@
 
 - **批量并发处理 (batch_concurrent)**：启用批量并发处理
 
+- **导出可编辑 PSD (export_editable_psd)**：导出分图层的 PSD 文件
+  - 需要安装 Photoshop
+  - 导出包含：原图、修复图、可编辑文本层
+  - 导出路径：`原图目录/manga_translator_work/psd/`
+- **PSD 默认字体 (psd_font)**：PSD 文本图层使用的默认字体
+- **仅生成 PSD 脚本 (psd_script_only)**：只生成 .jsx 脚本，不自动运行 Photoshop
+
 - **生成并导出 (generate_and_export)**：生成并导出翻译结果
 
 - **仅上色 (colorize_only)**：仅执行上色操作，不翻译
@@ -212,7 +219,7 @@
 
 - **字体颜色 (font_color)**：字体颜色（十六进制颜色代码，如 #FFFFFF）
 
-- **行间距 (line_spacing)**：行间距（控制行与行之间的距离）
+- **行间距 (line_spacing)**：行间距倍率（调节行与行之间的空隙），默认 1.0，范围 0.1-5.0
 
 - **字体大小 (font_size)**：固定字体大小（覆盖自动计算）
 
@@ -228,7 +235,7 @@
 
 - **AI断句自动扩大文字 (optimize_line_breaks)**：启用 AI 断句优化（自动调整字体大小以减少断行）
   - 需要配合 OpenAI/Gemini 翻译器使用
-  - AI 会自动优化文本断行，减少不必要的换行
+  - AI 会自动优化文本断行，提升文本可读性
 
 - **AI断句检查 (check_br_and_retry)**：检查 AI 断句结果并重试（确保断句质量）
   - 自动检查断句结果，如不符合要求则重试

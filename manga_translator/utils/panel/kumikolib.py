@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import shutil
 import cv2 as cv
 import numpy as np
 import requests
@@ -59,14 +60,24 @@ class Kumiko:
 			subprocess.run(args = ['pdftoppm', '--help'], check = True, capture_output = True)
 		except FileNotFoundError:
 			print("Please `apt install pdftoppm` if you give PDF --input files to Kumiko", file = sys.stderr)
-			sys.exit(1)
+			print("跳过PDF文件处理", file = sys.stderr)
+			return
 
 		self.temp_folder = tempfile.mkdtemp(prefix = "kumiko-pdf-pages-")
 
-		print(f"Using pdftoppm to extract jpeg files from pdf to {self.temp_folder}", file = sys.stderr)
-		subprocess.run(args = ['pdftoppm', '-jpeg', pdf_filename, f"{self.temp_folder}/"], check = True)
-
-		self.parse_dir(self.temp_folder)
+		try:
+			print(f"Using pdftoppm to extract jpeg files from pdf to {self.temp_folder}", file = sys.stderr)
+			subprocess.run(args = ['pdftoppm', '-jpeg', pdf_filename, f"{self.temp_folder}/"], check = True)
+			self.parse_dir(self.temp_folder)
+		except Exception as e:
+			print(f"无法处理PDF文件 '{pdf_filename}': {e}", file = sys.stderr)
+			print("跳过此PDF文件", file = sys.stderr)
+			# 清理临时文件夹
+			try:
+				if os.path.exists(self.temp_folder):
+					shutil.rmtree(self.temp_folder)
+			except Exception:
+				pass
 
 	def parse_dir(self, directory, urls = None):
 		filenames = []

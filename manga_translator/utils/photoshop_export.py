@@ -429,12 +429,10 @@ def generate_text_layer_jsx(index: int, text_region, default_font: str, line_spa
     font_size = text_region.font_size
     
     # 行间距系数 (leading factor)
-    if line_spacing is not None:
-        leading_factor = 1 + line_spacing
-    elif is_vertical:
-        leading_factor = 1.2
-    else:
-        leading_factor = 1.01
+    # 竖排基准间距 0.2, 横排基准间距 0.01
+    base_spacing = 0.2 if is_vertical else 0.01
+    multiplier = line_spacing if line_spacing is not None else 1.0
+    leading_factor = 1.0 + base_spacing * multiplier
     
     # 点文本的 position
     # 居中对齐时，position 应该是第一行(横排)或第一列(竖排)的基线中心点
@@ -559,7 +557,7 @@ def get_psd_output_path(image_path: str) -> str:
     return psd_path
 
 
-def photoshop_export(output_file: str, ctx: Context, default_font: str = "Arial", image_path: str = None, verbose: bool = False, result_path_fn=None, line_spacing: float = None):
+def photoshop_export(output_file: str, ctx: Context, default_font: str = "Arial", image_path: str = None, verbose: bool = False, result_path_fn=None, line_spacing: float = None, script_only: bool = False):
     """
     使用 Photoshop 导出 PSD 文件
     
@@ -576,6 +574,8 @@ def photoshop_export(output_file: str, ctx: Context, default_font: str = "Arial"
         image_path: 原图路径（用于查找工作目录中的修复图）
         verbose: 是否启用调试模式（保存JSX脚本到result文件夹）
         result_path_fn: 结果路径生成函数（用于保存调试脚本）
+        line_spacing: 行间距系数
+        script_only: 如果为True，只生成JSX脚本而不执行Photoshop
     """
     
     # 创建临时文件（只用于修复图和遮罩）
@@ -656,19 +656,39 @@ def photoshop_export(output_file: str, ctx: Context, default_font: str = "Arial"
         
         logger.info(f"生成 JSX 脚本: {jsx_file}")
         
-        # 如果启用verbose模式，保存JSX脚本到result文件夹用于调试
-        if verbose and result_path_fn:
+        # 如果启用verbose模式或script_only模式
+        saved_script_path = None
+        if verbose or script_only:
             try:
-                # 使用和其他调试图片相同的路径生成逻辑
                 image_name = os.path.basename(image_path) if image_path else "unknown"
                 base_name, _ = os.path.splitext(image_name)
-                debug_jsx_path = result_path_fn(f"{base_name}_photoshop_script.jsx")
-                
-                with open(debug_jsx_path, 'w', encoding='utf-8') as f:
-                    f.write(jsx_script)
-                logger.info(f"📝 调试JSX脚本已保存: {debug_jsx_path}")
+
+                if script_only and image_path:
+                    # script_only 模式下，保存到 manga_translator_work/psd
+                    image_dir = os.path.dirname(os.path.abspath(image_path))
+                    psd_dir = os.path.join(image_dir, 'manga_translator_work', 'psd')
+                    os.makedirs(psd_dir, exist_ok=True)
+                    debug_jsx_path = os.path.join(psd_dir, f"{base_name}_photoshop_script.jsx")
+                elif result_path_fn:
+                    # verbose 模式或无 image_path，保存到 result 目录
+                    debug_jsx_path = result_path_fn(f"{base_name}_photoshop_script.jsx")
+                else:
+                    debug_jsx_path = None
+
+                if debug_jsx_path:
+                    with open(debug_jsx_path, 'w', encoding='utf-8') as f:
+                        f.write(jsx_script)
+                    saved_script_path = debug_jsx_path
+                    logger.info(f"📝 JSX脚本已保存: {debug_jsx_path}")
             except Exception as e:
-                logger.warning(f"保存调试JSX脚本失败: {e}")
+                logger.warning(f"保存JSX脚本失败: {e}")
+        
+        # 如果只生成脚本，直接返回
+        if script_only:
+            logger.info(f"✅ 仅生成脚本模式：JSX脚本已保存，跳过Photoshop执行")
+            if saved_script_path:
+                logger.info(f"   脚本路径: {saved_script_path}")
+            return
         
         # 执行 Photoshop
         ps_executable = find_photoshop_executable()
@@ -747,8 +767,8 @@ def photoshop_export(output_file: str, ctx: Context, default_font: str = "Arial"
                 except Exception as e:
                     logger.warning(f"无法删除临时文件 {temp_file}: {e}")
         
-        # 如果不是verbose模式，删除JSX脚本
-        if not verbose and os.path.exists(jsx_file):
+        # 如果不是verbose模式且不是script_only模式，删除JSX脚本
+        if not verbose and not script_only and os.path.exists(jsx_file):
             try:
                 os.unlink(jsx_file)
             except Exception as e:

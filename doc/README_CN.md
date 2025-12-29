@@ -1023,7 +1023,7 @@ lowercase         将文本转换为小写
 gimp_font         用于GIMP渲染的字体系列
 no_hyphenation    是否禁用渲染器使用连字符(-)分割单词
 font_color        覆盖OCR模型检测到的文本前景/背景颜色。使用不带"#"的十六进制字符串，如FFFFFF:表示白色前景，:000000表示黑色描边，FFFFFF:000000表示同时设置二者
-line_spacing      行间距为字体大小 * 该值。水平文本默认为0.01，垂直文本默认为0.2
+line_spacing      行间距倍率，默认 1.0
 font_size         使用固定字体大小进行渲染
 rtl               合并文本时将文本区域从右向左排序，默认为true
 ```

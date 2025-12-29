@@ -14,8 +14,9 @@ class QueueElement:
     req: Request
     image: Image.Image | str
     config: Config
+    allow_offline: bool  # 是否允许离线继续执行
 
-    def __init__(self, req: Request, image: Image.Image, config: Config, length):
+    def __init__(self, req: Request, image: Image.Image, config: Config, length, allow_offline: bool = False):
         self.req = req
         if length > 10:
             #todo: store image in "upload-cache" folder
@@ -23,6 +24,7 @@ class QueueElement:
         else:
             self.image = image
         self.config = config
+        self.allow_offline = allow_offline
 
     def get_image(self)-> Image:
         if isinstance(self.image, str):
@@ -35,6 +37,9 @@ class QueueElement:
             os.remove(self.image)
 
     async def is_client_disconnected(self) -> bool:
+        # 如果允许离线翻译，则永不断开
+        if self.allow_offline:
+            return False
         if await self.req.is_disconnected():
             return True
         return False
@@ -46,14 +51,19 @@ class BatchQueueElement:
     images: List[Image.Image]
     config: Config
     batch_size: int
+    allow_offline: bool  # 是否允许离线继续执行
 
-    def __init__(self, req: Request, images: List[Image.Image], config: Config, batch_size: int):
+    def __init__(self, req: Request, images: List[Image.Image], config: Config, batch_size: int, allow_offline: bool = False):
         self.req = req
         self.images = images
         self.config = config
         self.batch_size = batch_size
+        self.allow_offline = allow_offline
 
     async def is_client_disconnected(self) -> bool:
+        # 如果允许离线翻译，则永不断开
+        if self.allow_offline:
+            return False
         if await self.req.is_disconnected():
             return True
         return False

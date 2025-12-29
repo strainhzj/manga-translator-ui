@@ -2,14 +2,12 @@
 from typing import Any
 
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QPushButton,
     QSplitter,
     QTabWidget,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -19,6 +17,7 @@ from editor.editor_logic import EditorLogic
 from editor.editor_model import EditorModel
 from editor.graphics_view import GraphicsView
 from services import get_i18n_manager
+from utils.shortcut_manager import EditorShortcutManager
 from widgets.editor_toolbar import EditorToolbar
 from widgets.file_list_view import FileListView
 from widgets.property_panel import PropertyPanel
@@ -75,7 +74,9 @@ class EditorView(QWidget):
 
         # --- 连接信号与槽 ---
         self._connect_signals()
-        self._setup_shortcuts()
+        
+        # --- 设置快捷键管理器 ---
+        self.shortcut_manager = EditorShortcutManager(self)
     
     def _t(self, key: str, **kwargs) -> str:
         """翻译辅助方法"""
@@ -83,99 +84,9 @@ class EditorView(QWidget):
             return self.i18n.translate(key, **kwargs)
         return key
 
-    def _setup_shortcuts(self):
-        """设置编辑器快捷键"""
-        # 撤销快捷键
-        self.undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, self)
-        self.undo_shortcut.activated.connect(self._handle_undo_shortcut)
-
-        # 重做快捷键
-        self.redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, self)
-        self.redo_shortcut.activated.connect(self._handle_redo_shortcut)
-
-        # 复制快捷键
-        self.copy_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self)
-        self.copy_shortcut.activated.connect(self._handle_copy_shortcut)
-
-        # 粘贴快捷键
-        self.paste_shortcut = QShortcut(QKeySequence.StandardKey.Paste, self)
-        self.paste_shortcut.activated.connect(self._handle_paste_shortcut)
-
-        # 删除快捷键
-        self.delete_shortcut = QShortcut(QKeySequence.StandardKey.Delete, self)
-        self.delete_shortcut.activated.connect(self._handle_delete_shortcut)
-
     def force_save_property_panel_edits(self):
         """强制保存property panel中的文本编辑"""
         self.property_panel.force_save_text_edits()
-    
-    def _handle_undo_shortcut(self):
-        # Find the currently focused widget
-        """处理撤销快捷键"""
-        # 检查焦点是否在文本控件上
-        focused_widget = self.focusWidget()
-        if isinstance(focused_widget, (QTextEdit, QLineEdit)):
-            # 如果焦点在文本控件上，让文本控件处理撤销
-            focused_widget.undo()
-        else:
-            # 否则调用编辑器的撤销
-            self.controller.undo()
-
-    def _handle_redo_shortcut(self):
-        """处理重做快捷键"""
-        # 检查焦点是否在文本控件上
-        focused_widget = self.focusWidget()
-        if isinstance(focused_widget, (QTextEdit, QLineEdit)):
-            # 如果焦点在文本控件上，让文本控件处理重做
-            focused_widget.redo()
-        else:
-            # 否则调用编辑器的重做
-            self.controller.redo()
-
-    def _handle_copy_shortcut(self):
-        """处理复制快捷键"""
-        focused_widget = self.focusWidget()
-        if isinstance(focused_widget, (QTextEdit, QLineEdit)):
-            # 如果焦点在文本控件上，让文本控件处理复制
-            focused_widget.copy()
-        else:
-            # 否则复制选中的区域
-            selected_regions = self.model.get_selection()
-            if selected_regions:
-                # 复制最后选中的区域
-                self.controller.copy_region(selected_regions[-1])
-
-    def _handle_paste_shortcut(self):
-        """处理粘贴快捷键"""
-        focused_widget = self.focusWidget()
-        if isinstance(focused_widget, (QTextEdit, QLineEdit)):
-            # 如果焦点在文本控件上，让文本控件处理粘贴
-            focused_widget.paste()
-        else:
-            # 否则根据是否有选中区域决定粘贴行为
-            selected_regions = self.model.get_selection()
-            if selected_regions and len(selected_regions) == 1:
-                # 有单个选中区域时，粘贴样式
-                self.controller.paste_region_style(selected_regions[0])
-            else:
-                # 无选中区域时，粘贴新区域到鼠标位置
-                # 获取鼠标在图像中的位置
-                from PyQt6.QtGui import QCursor
-                if self.graphics_view and self.graphics_view._image_item:
-                    mouse_pos_scene = self.graphics_view.mapToScene(self.graphics_view.mapFromGlobal(QCursor.pos()))
-                    mouse_pos_image = self.graphics_view._image_item.mapFromScene(mouse_pos_scene)
-                    self.controller.paste_region(mouse_pos_image)
-                else:
-                    self.controller.paste_region()
-
-    def _handle_delete_shortcut(self):
-        """处理删除快捷键"""
-        focused_widget = self.focusWidget()
-        if not isinstance(focused_widget, (QTextEdit, QLineEdit)):
-            # 只有在非文本控件上才处理删除区域
-            selected_regions = self.model.get_selection()
-            if selected_regions:
-                self.controller.delete_regions(selected_regions)
     
     def _handle_copy_from_panel(self):
         """处理属性面板的复制按钮"""

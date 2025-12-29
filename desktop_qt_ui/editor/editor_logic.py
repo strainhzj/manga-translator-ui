@@ -285,9 +285,18 @@ class EditorLogic(QObject):
         # 决定显示哪个文件列表
         files_to_show = translated_files if (show_translated and translated_files) else source_files
         
-        # 添加文件到新模型
+        # 清空文件模型
         self.file_model.clear()
-        self.file_model.add_files(files_to_show)
+        
+        # 批量添加文件，避免一次性处理过多文件导致UI卡顿
+        batch_size = 50  # 每批处理50个文件
+        for i in range(0, len(files_to_show), batch_size):
+            batch = files_to_show[i:i + batch_size]
+            self.file_model.add_files(batch)
+            
+            # 处理事件，保持UI响应
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
         
         # 如果有folder_tree，使用树形结构显示
         if folder_tree:

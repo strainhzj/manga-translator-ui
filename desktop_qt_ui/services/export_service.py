@@ -292,7 +292,7 @@ class ExportService:
         
         # 准备保存数据，确保数据格式正确
         save_data = []
-        for region in regions_data:
+        for idx, region in enumerate(regions_data):
             region_copy = region.copy()
 
             # 确保必要字段存在

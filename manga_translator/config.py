@@ -174,7 +174,7 @@ class RenderConfig(BaseModel):
     font_color: Optional[str] = None
     """Overwrite the text fg/bg color detected by the OCR model. Use hex string without the "#" such as FFFFFF for a white foreground or FFFFFF:000000 to also have a black background around the text."""
     line_spacing: Optional[float] = None
-    """Line spacing is font_size * this value. Default is 0.01 for horizontal text and 0.2 for vertical."""
+    """Line spacing multiplier. Default is 1.0. Actual spacing = font_size * base_spacing * multiplier (base: 0.01 for horizontal, 0.2 for vertical)."""
     font_size: Optional[int] = None
     """Use fixed font size for rendering"""
     rtl: bool = True
@@ -388,6 +388,8 @@ class CliConfig(BaseModel):
     """Export editable PSD file with layers (requires Photoshop)"""
     psd_font: Optional[str] = None
     """Font name for PSD export (PostScript name, e.g. ArialMT, SimHei). If not set, uses default font."""
+    psd_script_only: bool = False
+    """Only generate JSX script without executing Photoshop"""
 
 class OcrConfig(BaseModel):
     use_mocr_merge: bool = False

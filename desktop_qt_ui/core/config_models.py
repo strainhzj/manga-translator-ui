@@ -81,7 +81,7 @@ class RenderSettings(BaseModel):
     font_path: str = "Arial-Unicode-Regular.ttf"
     no_hyphenation: bool = False
     font_color: Optional[str] = None
-    line_spacing: Optional[float] = None
+    line_spacing: Optional[float] = 1.0  # 行间距倍率，默认1.0
     font_size: Optional[int] = None
     auto_rotate_symbols: bool = True
     rtl: bool = True
@@ -128,6 +128,7 @@ class CliSettings(BaseModel):
     save_to_source_dir: bool = False  # 输出到原图目录的 manga_translator_work/result 子目录
     export_editable_psd: bool = False  # 导出可编辑的PSD文件（需要Photoshop）
     psd_font: Optional[str] = None  # PSD导出使用的字体名称 (PostScript名称)
+    psd_script_only: bool = False  # 仅生成JSX脚本而不执行Photoshop
 
 class AppSection(BaseModel):
     last_open_dir: str = '.'

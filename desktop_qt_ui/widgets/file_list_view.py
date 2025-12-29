@@ -1122,3 +1122,45 @@ class FileListView(QTreeWidget):
             event.acceptProposedAction()
         else:
             event.ignore()
+
+    def select_next_image(self):
+        """Select the next image in the list, skipping folders."""
+        current_items = self.selectedItems()
+        next_item = None
+        
+        if not current_items:
+            # If nothing selected, find first file
+            from PyQt6.QtWidgets import QTreeWidgetItemIterator
+            iterator = QTreeWidgetItemIterator(self)
+            while iterator.value():
+                item = iterator.value()
+                file_path = item.data(0, Qt.ItemDataRole.UserRole)
+                if file_path and os.path.isfile(file_path):
+                    self.setCurrentItem(item)
+                    return
+                iterator += 1
+            return
+            
+        current = current_items[0]
+        next_item = self.itemBelow(current)
+        while next_item:
+            file_path = next_item.data(0, Qt.ItemDataRole.UserRole)
+            if file_path and os.path.isfile(file_path):
+                self.setCurrentItem(next_item)
+                return
+            next_item = self.itemBelow(next_item)
+
+    def select_prev_image(self):
+        """Select the previous image in the list, skipping folders."""
+        current_items = self.selectedItems()
+        if not current_items:
+            return
+            
+        current = current_items[0]
+        prev_item = self.itemAbove(current)
+        while prev_item:
+            file_path = prev_item.data(0, Qt.ItemDataRole.UserRole)
+            if file_path and os.path.isfile(file_path):
+                self.setCurrentItem(prev_item)
+                return
+            prev_item = self.itemAbove(prev_item)

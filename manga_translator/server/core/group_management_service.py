@@ -265,6 +265,7 @@ class GroupManagementService:
                 "denied_languages": group_data.get("denied_languages", []),
                 "default_preset_id": group_data.get("default_preset_id"),
                 "visible_presets": group_data.get("visible_presets", []),
+                "allow_offline_translation": group_data.get("allow_offline_translation", False),
                 "is_system": self.group_repo.is_system_group(group_id)
             }
             

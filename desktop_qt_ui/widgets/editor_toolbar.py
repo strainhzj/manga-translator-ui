@@ -56,17 +56,17 @@ class EditorToolbar(QWidget):
 
         self.export_button = QToolButton()
         self.export_button.setText(self._t("Export Image"))
-        self.export_button.setToolTip(self._t("Export current rendered image"))
+        self.export_button.setToolTip(self._t("Export current rendered image") + " (Ctrl+Q)")
         layout.addWidget(self.export_button)
         
         self.save_json_button = QToolButton()
         self.save_json_button.setText(self._t("Save JSON"))
-        self.save_json_button.setToolTip(self._t("Save translation data to JSON file"))
+        self.save_json_button.setToolTip(self._t("Save translation data to JSON file") + " (Ctrl+W)")
         layout.addWidget(self.save_json_button)
         
         self.edit_file_button = QToolButton()
         self.edit_file_button.setText(self._t("Edit Original"))
-        self.edit_file_button.setToolTip(self._t("Switch to source file of current translation for editing"))
+        self.edit_file_button.setToolTip(self._t("Switch to source file of current translation for editing") + " (Ctrl+E)")
         layout.addWidget(self.edit_file_button)
 
         layout.addWidget(self._create_separator())
@@ -75,13 +75,13 @@ class EditorToolbar(QWidget):
         self.undo_button = QToolButton()
         self.undo_button.setText(self._t("Undo"))
         self.undo_button.setEnabled(False)
-        self.undo_button.setToolTip(self._t("Undo last operation"))
+        self.undo_button.setToolTip(self._t("Undo last operation") + " (Ctrl+Z)")
         layout.addWidget(self.undo_button)
 
         self.redo_button = QToolButton()
         self.redo_button.setText(self._t("Redo"))
         self.redo_button.setEnabled(False)
-        self.redo_button.setToolTip(self._t("Redo last undone operation"))
+        self.redo_button.setToolTip(self._t("Redo last undone operation") + " (Ctrl+Y)")
         layout.addWidget(self.redo_button)
 
         self.edit_geometry_button = QToolButton()
@@ -209,21 +209,25 @@ class EditorToolbar(QWidget):
     def update_zoom_level(self, zoom_level: float):
         self.zoom_label.setText(f"{zoom_level:.0%}")
     
+    def set_export_enabled(self, enabled: bool):
+        """设置导出按钮的启用状态"""
+        self.export_button.setEnabled(enabled)
+    
     def refresh_ui_texts(self):
         """刷新所有UI文本（用于语言切换）"""
         # 刷新按钮文本
         self.back_button.setText(self._t("Back"))
         self.back_button.setToolTip(self._t("Back to Main"))
         self.export_button.setText(self._t("Export Image"))
-        self.export_button.setToolTip(self._t("Export current rendered image"))
+        self.export_button.setToolTip(self._t("Export current rendered image") + " (Ctrl+Q)")
         self.save_json_button.setText(self._t("Save JSON"))
-        self.save_json_button.setToolTip(self._t("Save translation data to JSON file"))
+        self.save_json_button.setToolTip(self._t("Save translation data to JSON file") + " (Ctrl+W)")
         self.edit_file_button.setText(self._t("Edit Original"))
-        self.edit_file_button.setToolTip(self._t("Switch to source file of current translation for editing"))
+        self.edit_file_button.setToolTip(self._t("Switch to source file of current translation for editing") + " (Ctrl+E)")
         self.undo_button.setText(self._t("Undo"))
-        self.undo_button.setToolTip(self._t("Undo last operation"))
+        self.undo_button.setToolTip(self._t("Undo last operation") + " (Ctrl+Z)")
         self.redo_button.setText(self._t("Redo"))
-        self.redo_button.setToolTip(self._t("Redo last undone operation"))
+        self.redo_button.setToolTip(self._t("Redo last undone operation") + " (Ctrl+Y)")
         self.edit_geometry_button.setText(self._t("Edit Shape"))
         self.edit_geometry_button.setToolTip(self._t("Add new associated shape for selected text box"))
         self.zoom_out_button.setText(self._t("Zoom Out (-)"))

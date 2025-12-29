@@ -71,6 +71,8 @@ class TextBlock(object):
                  shadow_offset: List = [0, 0],
                  prob: float = 1,
                  layout_mode: str = 'default',
+                 stroke_color_type: str = None,  # 新增：描边颜色类型 "white" 或 "black"
+                 adjust_bg_color: bool = True,  # 新增：是否自动调整描边颜色
                  **kwargs) -> None:
         self.lines = np.array(lines, dtype=np.float64)
         # self.lines.sort()
@@ -126,13 +128,22 @@ class TextBlock(object):
         self._bounding_rect = _bounding_rect
         self.default_stroke_width = default_stroke_width
         self.font_weight = font_weight
-        self.adjust_bg_color = True
+        self.adjust_bg_color = adjust_bg_color  # 使用传入的参数
 
         self.opacity = opacity
         self.shadow_radius = shadow_radius
         self.shadow_strength = shadow_strength
         self.shadow_color = shadow_color
         self.shadow_offset = shadow_offset
+        
+        # 描边颜色类型：如果没有指定，根据字体颜色自动确定
+        if stroke_color_type is None:
+            # 计算字体颜色的平均值
+            fg_avg = sum(self.fg_colors) / 3 if isinstance(self.fg_colors, (list, tuple)) else 127
+            # 暗色字体用白色描边，亮色字体用黑色描边
+            self.stroke_color_type = "white" if fg_avg <= 127 else "black"
+        else:
+            self.stroke_color_type = stroke_color_type
 
     @cached_property
     def xyxy(self):
@@ -280,7 +291,8 @@ class TextBlock(object):
             'target_lang': self.target_lang,
             'source_lang': self.source_lang,
             'line_spacing': self.line_spacing,
-            'default_stroke_width': self.default_stroke_width,
+            'stroke_width': self.default_stroke_width,  # 统一使用 stroke_width（后端加载时会转换为 default_stroke_width）
+            'stroke_color_type': self.stroke_color_type,  # 新增：描边颜色类型
             'adjust_bg_color': self.adjust_bg_color,
             'prob': self.prob
         }
@@ -521,6 +533,10 @@ class TextBlock(object):
 
     @property
     def stroke_width(self):
+        # 如果用户手动指定了描边颜色（adjust_bg_color=False），则强制使用设定的宽度
+        if not self.adjust_bg_color:
+            return self.default_stroke_width
+            
         diff = color_difference(*self.get_font_colors())
         if diff > 15:
             return self.default_stroke_width

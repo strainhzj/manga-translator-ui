@@ -432,6 +432,36 @@ class MangaTranslator:
         # Prepare data for JSON serialization
         regions_data = [region.to_dict() for region in ctx.text_regions]
 
+        # 强制使用Config中的排版方向和对齐方式覆盖（如果存在）
+        # 这是为了确保即使 textline_merge 检测过程使用了 auto，
+        # 最终保存时也会反映用户的强制设置（例如全书强制横排）
+        if config and hasattr(config, 'render'):
+            try:
+                # 覆盖方向
+                if hasattr(config.render, 'direction'):
+                    dir_val = config.render.direction
+                    if hasattr(dir_val, 'value'): dir_val = dir_val.value
+                    
+                    forced_direction = None
+                    if dir_val == 'vertical': forced_direction = 'v'
+                    elif dir_val == 'horizontal': forced_direction = 'h'
+                    
+                    if forced_direction:
+                        for region in regions_data:
+                            region['direction'] = forced_direction
+                
+                # 覆盖对齐方式
+                if hasattr(config.render, 'alignment'):
+                    align_val = config.render.alignment
+                    if hasattr(align_val, 'value'): align_val = align_val.value
+                    
+                    if align_val in ('left', 'center', 'right'):
+                        for region in regions_data:
+                            region['alignment'] = align_val
+                            
+            except Exception as e:
+                logger.warning(f"Failed to override region settings from config: {e}")
+
         # 获取图片尺寸（优先使用保存的尺寸，兼容并发模式）
         if hasattr(ctx, 'original_size') and ctx.original_size:
             original_width, original_height = ctx.original_size
@@ -713,6 +743,26 @@ class MangaTranslator:
                             region_data['bg_color'] = (r, g, b)
                         except (ValueError, TypeError):
                              pass
+                
+                # 处理 stroke_color_type（新参数）
+                # 如果有 stroke_color_type，根据它设置 bg_color 和 adjust_bg_color
+                if 'stroke_color_type' in region_data:
+                    stroke_color_type = region_data.get('stroke_color_type')
+                    if stroke_color_type == "white":
+                        region_data['bg_color'] = (255, 255, 255)
+                        region_data['adjust_bg_color'] = False  # 禁用自动调整
+                    elif stroke_color_type == "black":
+                        region_data['bg_color'] = (0, 0, 0)
+                        region_data['adjust_bg_color'] = False  # 禁用自动调整
+                    # stroke_color_type 会被传递给 TextBlock 构造函数
+                
+                # 描边宽度 - stroke_width 优先级高于 default_stroke_width
+                # 用户在编辑器中设置的 stroke_width 应该覆盖原始的 default_stroke_width
+                if 'stroke_width' in region_data:
+                    region_data['default_stroke_width'] = region_data.pop('stroke_width')
+                
+                # 确保 line_spacing 和 default_stroke_width 被正确传递
+                # 这些参数已经在 region_data 中，会被 TextBlock 构造函数接收
 
                 # Recreate the TextBlock object by unpacking the dictionary
                 # This restores all saved attributes
@@ -2877,7 +2927,8 @@ class MangaTranslator:
                                             cli_cfg = getattr(config, 'cli', None)
                                             default_font = getattr(cli_cfg, 'psd_font', None) or getattr(render_cfg, 'font_path', 'Arial') or 'Arial'
                                             line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
-                                            photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing)
+                                            script_only = getattr(cli_cfg, 'psd_script_only', False)
+                                            photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing, script_only)
                                             logger.info(f"  -> ✅ [PSD] Exported editable PSD: {os.path.basename(psd_path)}")
                                         except Exception as psd_err:
                                             logger.error(f"Error exporting PSD for {os.path.basename(ctx.image_name)}: {psd_err}")
@@ -3016,7 +3067,8 @@ class MangaTranslator:
                                         cli_cfg = getattr(config, 'cli', None)
                                         default_font = getattr(cli_cfg, 'psd_font', None) or getattr(render_cfg, 'font_path', 'Arial') or 'Arial'
                                         line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
-                                        photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing)
+                                        script_only = getattr(cli_cfg, 'psd_script_only', False)
+                                        photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing, script_only)
                                         logger.info(f"  -> ✅ [PSD] Exported editable PSD: {os.path.basename(psd_path)}")
                                     except Exception as psd_err:
                                         logger.error(f"Error exporting PSD for {os.path.basename(ctx.image_name)}: {psd_err}")
@@ -4805,7 +4857,8 @@ class MangaTranslator:
                                     cli_cfg = getattr(config, 'cli', None)
                                     default_font = getattr(cli_cfg, 'psd_font', None) or getattr(render_cfg, 'font_path', 'Arial') or 'Arial'
                                     line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
-                                    photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing)
+                                    script_only = getattr(cli_cfg, 'psd_script_only', False)
+                                    photoshop_export(psd_path, ctx, default_font, ctx.image_name, self.verbose, self._result_path, line_spacing, script_only)
                                     logger.info(f"  -> ✅ [PSD] Exported editable PSD: {os.path.basename(psd_path)}")
                                 except Exception as psd_err:
                                     logger.error(f"Error exporting PSD for {os.path.basename(ctx.image_name)}: {psd_err}")

@@ -89,7 +89,16 @@ def render_text_for_region(text_block: TextBlock, dst_points: np.ndarray, transf
         render_h = round(norm_v[0])
         font_size = text_block.font_size
 
-        fg_color, bg_color = text_block.get_font_colors()
+        # 从 text_block 获取默认颜色
+        fg_color, bg_color_default = text_block.get_font_colors()
+        
+        # 优先使用 render_params 中用户设置的描边颜色
+        bg_color = render_params.get('text_stroke_color', bg_color_default)
+        logger.debug(f"[EDITOR RENDER] 描边颜色: text_stroke_color={render_params.get('text_stroke_color')}, bg_color_default={bg_color_default}, 最终使用={bg_color}")
+        
+        # 从 render_params 中获取描边宽度
+        stroke_width = render_params.get('text_stroke_width', None)
+        
         if disable_font_border:
             bg_color = None
 
@@ -121,7 +130,12 @@ def render_text_for_region(text_block: TextBlock, dst_points: np.ndarray, transf
         config_data['disable_auto_wrap'] = effective_disable_auto_wrap
 
         config_obj = Config(render=RenderConfig(**config_data)) if config_data else Config()
-        line_spacing_from_params = render_params.get('line_spacing')
+        line_spacing_multiplier = render_params.get('line_spacing', 1.0)
+        
+        # 将倍率转换为实际比例：横排基础 0.01，竖排基础 0.2
+        is_horizontal = text_block.horizontal
+        base_spacing = 0.01 if is_horizontal else 0.2
+        line_spacing_from_params = base_spacing * line_spacing_multiplier
 
         # 获取区域数（lines数组的长度），用于智能排版模式的换行判断
         region_count = 1
@@ -146,7 +160,8 @@ def render_text_for_region(text_block: TextBlock, dst_points: np.ndarray, transf
                 hyphenate, 
                 line_spacing_from_params, 
                 config=config_obj, 
-                region_count=region_count
+                region_count=region_count,
+                stroke_width=stroke_width
             )
         else:
             rendered_surface = text_render.put_text_vertical(
@@ -158,7 +173,8 @@ def render_text_for_region(text_block: TextBlock, dst_points: np.ndarray, transf
                 bg_color, 
                 line_spacing_from_params, 
                 config=config_obj, 
-                region_count=region_count
+                region_count=region_count,
+                stroke_width=stroke_width
             )
 
         if rendered_surface is None or rendered_surface.size == 0:

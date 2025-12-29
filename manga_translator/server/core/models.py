@@ -29,6 +29,9 @@ class UserPermissions:
     can_upload_files: bool = True
     can_delete_files: bool = True
     
+    # 离线翻译权限
+    allow_offline_translation: bool = False  # 是否允许离线翻译（用户离线后继续处理任务）
+    
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return asdict(self)
@@ -44,7 +47,8 @@ class UserPermissions:
             max_concurrent_tasks=data.get('max_concurrent_tasks', 10),
             daily_quota=data.get('daily_quota', -1),
             can_upload_files=data.get('can_upload_files', True),
-            can_delete_files=data.get('can_delete_files', True)
+            can_delete_files=data.get('can_delete_files', True),
+            allow_offline_translation=data.get('allow_offline_translation', False)
         )
 
 

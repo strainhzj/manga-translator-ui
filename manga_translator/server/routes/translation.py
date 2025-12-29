@@ -461,6 +461,20 @@ async def batch_images(req: Request, data: BatchTranslateRequest):
         # Verify authentication and permissions
         username, ip_address = await verify_translation_auth(req, config)
         
+        # 检查用户是否有离线翻译权限
+        from manga_translator.server.core.middleware import get_services
+        _, permission_service, _ = get_services()
+        allow_offline = permission_service.check_offline_translation_permission(username)
+        
+        # 如果允许离线翻译，创建一个永不断开的 Request 包装器
+        if allow_offline:
+            class OfflineRequest:
+                """支持离线翻译的 Request 包装器"""
+                async def is_disconnected(self):
+                    return False  # 永不断开
+            req = OfflineRequest()
+            add_log(f"用户 {username} 启用离线翻译模式", "INFO")
+        
         # 获取用户预设的 API Keys
         env_vars = await apply_user_env_vars("{}", config, admin_settings, username)
         config._user_env_vars = env_vars

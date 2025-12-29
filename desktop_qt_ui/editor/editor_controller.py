@@ -371,6 +371,10 @@ class EditorController(QObject):
         self.model.set_inpainted_image(None)
         self.model.set_selection([])
 
+        # 禁用导出功能（无图片时不可导出）
+        if self.view and hasattr(self.view, 'toolbar'):
+            self.view.toolbar.set_export_enabled(False)
+
         # 清空历史记录
         self.history_service.clear()
         
@@ -609,6 +613,10 @@ class EditorController(QObject):
             self.model.set_raw_mask(None)
             self.model.set_refined_mask(None)
             self.model.set_inpainted_image_path(None)
+
+            # 禁用导出功能
+            if self.view and hasattr(self.view, 'toolbar'):
+                self.view.toolbar.set_export_enabled(False)
         except Exception as e:
             self.logger.error(f"Error applying translated image to model: {e}")
     
@@ -619,6 +627,10 @@ class EditorController(QObject):
             if hasattr(self, '_loading_toast') and self._loading_toast:
                 self._loading_toast.close()
                 self._loading_toast = None
+            
+            # 启用导出功能
+            if self.view and hasattr(self.view, 'toolbar'):
+                self.view.toolbar.set_export_enabled(True)
             
             # 导入渲染参数
             if regions:
@@ -1794,6 +1806,7 @@ class EditorController(QObject):
                 from services import get_render_parameter_service
                 render_service = get_render_parameter_service()
                 render_params = render_service.export_parameters_for_backend(i, enhanced_region)
+                
                 enhanced_region.update(render_params)
 
                 enhanced_regions.append(enhanced_region)

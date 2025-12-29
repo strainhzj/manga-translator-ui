@@ -178,8 +178,23 @@ class EditorModel(QObject):
     def update_region_style(self, index: int, key: str, value: Any):
         """Updates only the style of a specific region and emits a targeted signal."""
         if 0 <= index < len(self._regions):
-            if self._regions[index].get(key) != value:
+            old_value = self._regions[index].get(key)
+            if old_value != value:
                 self._regions[index][key] = value
+                
+                # 同步更新 ResourceManager 中的数据
+                if self.controller:
+                    try:
+                        resource_manager = self.controller.resource_manager
+                        all_regions = resource_manager.get_all_regions()
+                        if index < len(all_regions):
+                            region_resource = all_regions[index]
+                            resource_manager.update_region(region_resource.region_id, {key: value})
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger('manga_translator')
+                        logger.warning(f"Failed to sync region {index} to ResourceManager: {e}")
+                
                 self.region_style_updated.emit(index) # Emit targeted signal
 
     def update_region_data(self, index: int, key: str, value: Any):
@@ -192,3 +207,16 @@ class EditorModel(QObject):
         """静默更新整个区域数据,不发出信号"""
         if 0 <= index < len(self._regions):
             self._regions[index].update(new_data)
+            
+            # 同步更新 ResourceManager 中的数据
+            if self.controller:
+                try:
+                    resource_manager = self.controller.resource_manager
+                    all_regions = resource_manager.get_all_regions()
+                    if index < len(all_regions):
+                        region_resource = all_regions[index]
+                        resource_manager.update_region(region_resource.region_id, new_data)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger('manga_translator')
+                    logger.warning(f"Failed to sync region {index} to ResourceManager: {e}")

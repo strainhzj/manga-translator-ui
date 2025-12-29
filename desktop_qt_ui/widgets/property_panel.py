@@ -188,10 +188,13 @@ class PropertyPanel(QWidget):
 
         self.brush_button = QPushButton(self._t("Brush"))
         self.brush_button.setCheckable(True)
+        self.brush_button.setToolTip(self._t("Brush Tool") + " (W)")
         self.eraser_button = QPushButton(self._t("Eraser"))
         self.eraser_button.setCheckable(True)
+        self.eraser_button.setToolTip(self._t("Eraser Tool") + " (E)")
         self.select_button = QPushButton(self._t("No Selection"))
         self.select_button.setCheckable(True)
+        self.select_button.setToolTip(self._t("Selection Tool") + " (Q)")
 
         self.mask_tool_group.addButton(self.select_button, 0)
         self.mask_tool_group.addButton(self.brush_button, 1)
@@ -348,6 +351,36 @@ class PropertyPanel(QWidget):
         self.font_color_label = QLabel(self._t("Font Color:"))
         style_layout.addRow(self.font_color_label, self.font_color_button)
         
+        # Stroke color (描边颜色 - 黑白选择)
+        self.stroke_color_combo = QComboBox()
+        self.stroke_color_combo.addItem(self._t("White"), "white")
+        self.stroke_color_combo.addItem(self._t("Black"), "black")
+        self.stroke_color_label = QLabel(self._t("Stroke Color:"))
+        style_layout.addRow(self.stroke_color_label, self.stroke_color_combo)
+        
+        # Stroke width (描边宽度)
+        from PyQt6.QtWidgets import QDoubleSpinBox
+        stroke_width_layout = QHBoxLayout()
+        self.stroke_width_spinbox = QDoubleSpinBox()
+        self.stroke_width_spinbox.setRange(0.0, 1.0)
+        self.stroke_width_spinbox.setSingleStep(0.01)
+        self.stroke_width_spinbox.setDecimals(2)
+        self.stroke_width_spinbox.setValue(0.07)
+        stroke_width_layout.addWidget(self.stroke_width_spinbox)
+        self.stroke_width_label = QLabel(self._t("Stroke Width:"))
+        style_layout.addRow(self.stroke_width_label, stroke_width_layout)
+        
+        # Line spacing (行间距倍率)
+        line_spacing_layout = QHBoxLayout()
+        self.line_spacing_spinbox = QDoubleSpinBox()
+        self.line_spacing_spinbox.setRange(0.1, 5.0)
+        self.line_spacing_spinbox.setSingleStep(0.1)
+        self.line_spacing_spinbox.setDecimals(1)
+        self.line_spacing_spinbox.setValue(1.0)
+        line_spacing_layout.addWidget(self.line_spacing_spinbox)
+        self.line_spacing_label = QLabel(self._t("Line Spacing:"))
+        style_layout.addRow(self.line_spacing_label, line_spacing_layout)
+        
         # Alignment and direction
         self.alignment_combo = QComboBox()
         self.direction_combo = QComboBox()
@@ -391,8 +424,11 @@ class PropertyPanel(QWidget):
         action_layout = QHBoxLayout(self.action_frame)
         action_layout.setSpacing(4)
         self.copy_button = QPushButton(self._t("Copy"))
+        self.copy_button.setToolTip(self._t("Copy") + " (Ctrl+C)")
         self.paste_button = QPushButton(self._t("Paste"))
+        self.paste_button.setToolTip(self._t("Paste") + " (Ctrl+V)")
         self.delete_button = QPushButton(self._t("Delete"))
+        self.delete_button.setToolTip(self._t("Delete") + " (Del)")
         action_layout.addWidget(self.copy_button)
         action_layout.addWidget(self.paste_button)
         action_layout.addWidget(self.delete_button)
@@ -416,6 +452,9 @@ class PropertyPanel(QWidget):
         self.font_size_input.editingFinished.connect(self._on_font_size_editing_finished)
         self.font_size_slider.valueChanged.connect(self._on_font_size_slider_changed)
         self.font_color_button.clicked.connect(self._on_font_color_clicked)
+        self.stroke_color_combo.currentIndexChanged.connect(self._on_stroke_color_changed)
+        self.stroke_width_spinbox.valueChanged.connect(self._on_stroke_width_changed)
+        self.line_spacing_spinbox.valueChanged.connect(self._on_line_spacing_changed)
         # 实时更新（textChanged）
         self.translated_text_box.textChanged.connect(self._on_translated_text_changed)
         # self.translated_text_box.focusOutEvent = self._make_focus_out_handler(self.translated_text_box, self._on_translated_text_focus_out)
@@ -627,6 +666,12 @@ class PropertyPanel(QWidget):
             self.font_size_label.setText(self._t("Font Size:"))
         if hasattr(self, 'font_color_label'):
             self.font_color_label.setText(self._t("Font Color:"))
+        if hasattr(self, 'stroke_color_label'):
+            self.stroke_color_label.setText(self._t("Stroke Color:"))
+        if hasattr(self, 'stroke_width_label'):
+            self.stroke_width_label.setText(self._t("Stroke Width:"))
+        if hasattr(self, 'line_spacing_label'):
+            self.line_spacing_label.setText(self._t("Line Spacing:"))
         if hasattr(self, 'alignment_label'):
             self.alignment_label.setText(self._t("Alignment:"))
         if hasattr(self, 'direction_label'):
@@ -647,10 +692,13 @@ class PropertyPanel(QWidget):
             self.update_mask_button.setText(self._t("Update Mask"))
         if hasattr(self, 'brush_button'):
             self.brush_button.setText(self._t("Brush"))
+            self.brush_button.setToolTip(self._t("Brush Tool") + " (W)")
         if hasattr(self, 'eraser_button'):
             self.eraser_button.setText(self._t("Eraser"))
+            self.eraser_button.setToolTip(self._t("Eraser Tool") + " (E)")
         if hasattr(self, 'select_button'):
             self.select_button.setText(self._t("No Selection"))
+            self.select_button.setToolTip(self._t("Selection Tool") + " (Q)")
         if hasattr(self, 'insert_placeholder_button'):
             self.insert_placeholder_button.setText(self._t("Placeholder"))
             self.insert_placeholder_button.setToolTip(self._t("Insert placeholder ＿"))
@@ -662,10 +710,13 @@ class PropertyPanel(QWidget):
             self.mark_horizontal_button.setToolTip(self._t("Mark selected text as horizontal display"))
         if hasattr(self, 'copy_button'):
             self.copy_button.setText(self._t("Copy"))
+            self.copy_button.setToolTip(self._t("Copy") + " (Ctrl+C)")
         if hasattr(self, 'paste_button'):
             self.paste_button.setText(self._t("Paste"))
+            self.paste_button.setToolTip(self._t("Paste") + " (Ctrl+V)")
         if hasattr(self, 'delete_button'):
             self.delete_button.setText(self._t("Delete"))
+            self.delete_button.setToolTip(self._t("Delete") + " (Del)")
         
         # 刷新复选框
         if hasattr(self, 'ignore_bubble_checkbox'):
@@ -685,6 +736,13 @@ class PropertyPanel(QWidget):
                 self.font_family_combo.setItemText(0, self._t("Default Font"))
             # 恢复选中的索引
             self.font_family_combo.setCurrentIndex(current_index)
+        
+        # 刷新描边颜色下拉框的选项
+        if hasattr(self, 'stroke_color_combo') and self.stroke_color_combo.count() == 2:
+            current_index = self.stroke_color_combo.currentIndex()
+            self.stroke_color_combo.setItemText(0, self._t("White"))
+            self.stroke_color_combo.setItemText(1, self._t("Black"))
+            self.stroke_color_combo.setCurrentIndex(current_index)
         
         # 刷新下拉菜单（重新填充以使用新的翻译）
         self._refresh_combo_boxes()
@@ -804,8 +862,11 @@ class PropertyPanel(QWidget):
         self.original_text_box.clear()
         self.translated_text_box.clear()
         self.font_size_input.clear()
+        self.stroke_width_spinbox.setValue(0.07)  # 重置为默认值
+        self.line_spacing_spinbox.setValue(1.0)  # 重置为默认值
         default_color = self.config_service.get_config().render.font_color or "#000000"
         self.font_color_button.setStyleSheet(f"background-color: {default_color};")
+        self.stroke_color_combo.setCurrentIndex(0)  # 默认白色
         self.index_label.setText("-")
         self.bbox_label.setText("-")
         self.size_label.setText("-")
@@ -892,6 +953,57 @@ class PropertyPanel(QWidget):
              color_hex = f"#{int(fg_colors[0]):02x}{int(fg_colors[1]):02x}{int(fg_colors[2]):02x}"
 
         self.font_color_button.setStyleSheet(f"background-color: {color_hex};")
+        
+        # 更新描边颜色下拉框 - 优先使用 stroke_color_type
+        stroke_color_type = region_data.get('stroke_color_type')
+        if stroke_color_type:
+            # 直接使用 stroke_color_type
+            if stroke_color_type == "white":
+                self.stroke_color_combo.setCurrentIndex(0)
+            else:  # black
+                self.stroke_color_combo.setCurrentIndex(1)
+        else:
+            # 如果没有 stroke_color_type，从 bg_colors 判断
+            bg_colors = region_data.get('bg_colors')
+            if isinstance(bg_colors, (list, tuple)) and len(bg_colors) == 3:
+                avg = sum(bg_colors) / 3
+                if avg > 127:
+                    self.stroke_color_combo.setCurrentIndex(0)  # White
+                else:
+                    self.stroke_color_combo.setCurrentIndex(1)  # Black
+            else:
+                # 根据字体颜色自动判断
+                if font_color and isinstance(font_color, str) and font_color.startswith('#'):
+                    try:
+                        r = int(font_color[1:3], 16)
+                        g = int(font_color[3:5], 16)
+                        b = int(font_color[5:7], 16)
+                        fg_avg = (r + g + b) / 3
+                        if fg_avg <= 127:
+                            self.stroke_color_combo.setCurrentIndex(0)  # White
+                        else:
+                            self.stroke_color_combo.setCurrentIndex(1)  # Black
+                    except (ValueError, IndexError):
+                        self.stroke_color_combo.setCurrentIndex(0)
+                else:
+                    fg_colors = region_data.get('fg_colors')
+                    if isinstance(fg_colors, (list, tuple)) and len(fg_colors) == 3:
+                        fg_avg = sum(fg_colors) / 3
+                        if fg_avg <= 127:
+                            self.stroke_color_combo.setCurrentIndex(0)  # White
+                        else:
+                            self.stroke_color_combo.setCurrentIndex(1)  # Black
+                    else:
+                        self.stroke_color_combo.setCurrentIndex(0)  # 默认白色
+
+        
+        # Update stroke width
+        stroke_width = region_data.get("stroke_width", region_data.get("default_stroke_width", 0.07))
+        self.stroke_width_spinbox.setValue(stroke_width)
+        
+        # Update line spacing
+        line_spacing = region_data.get("line_spacing", 1.0)
+        self.line_spacing_spinbox.setValue(line_spacing)
         
         # Update font family selector
         font_path = region_data.get("font_path", "")
@@ -1064,6 +1176,47 @@ class PropertyPanel(QWidget):
             hex_color = color.name()
             self.font_color_button.setStyleSheet(f"background-color: {hex_color};")
             self.font_color_changed.emit(self.current_region_index, hex_color)
+            # 字体颜色改变时，根据算法自动更新描边颜色选择
+            self._auto_select_stroke_color(hex_color)
+
+    def _auto_select_stroke_color(self, font_color_hex):
+        """根据字体颜色自动选择描边颜色（黑或白）"""
+        try:
+            # 解析字体颜色
+            r = int(font_color_hex[1:3], 16)
+            g = int(font_color_hex[3:5], 16)
+            b = int(font_color_hex[5:7], 16)
+            
+            # 计算平均值
+            fg_avg = (r + g + b) / 3
+            
+            # 根据后端算法：fg_avg <= 127 用白色，否则用黑色
+            if fg_avg <= 127:
+                self.stroke_color_combo.setCurrentIndex(0)  # White
+            else:
+                self.stroke_color_combo.setCurrentIndex(1)  # Black
+        except Exception as e:
+            logger.error(f"自动选择描边颜色失败: {e}")
+
+    def _on_stroke_color_changed(self, index):
+        """处理描边颜色下拉框变化"""
+        if self.current_region_index == -1:
+            return
+        
+        color_type = self.stroke_color_combo.currentData()
+        
+        # 只设置 stroke_color_type，后端会根据它自动处理 bg_colors 和 adjust_bg_color
+        self.model.update_region_style(self.current_region_index, "stroke_color_type", color_type)
+
+    def _on_stroke_width_changed(self, value):
+        """处理描边宽度变化"""
+        if self.current_region_index != -1:
+            self.model.update_region_style(self.current_region_index, "stroke_width", value)
+
+    def _on_line_spacing_changed(self, value):
+        """处理行间距倍率变化"""
+        if self.current_region_index != -1:
+            self.model.update_region_style(self.current_region_index, "line_spacing", value)
 
     def _on_mask_tool_changed(self, button):
         if button == self.select_button:

@@ -244,18 +244,31 @@ class ModelWrapper(ABC):
                 extracted_path = os.path.join(os.path.dirname(download_path), 'extracted')
                 print(f' -- Extracting files')
                 
-                # 处理 .7z 格式
-                if download_path.endswith('.7z'):
+                try:
+                    # 处理 .7z 格式
+                    if download_path.endswith('.7z'):
+                        try:
+                            import py7zr
+                        except ImportError:
+                            raise ImportError('py7zr is required for .7z archives. Install it with: pip install py7zr')
+                        
+                        os.makedirs(extracted_path, exist_ok=True)
+                        with py7zr.SevenZipFile(download_path, mode='r') as archive:
+                            archive.extractall(path=extracted_path)
+                    else:
+                        shutil.unpack_archive(download_path, extracted_path)
+                except Exception as e:
+                    print(f' -- 无法解压文件 "{download_path}": {e}')
+                    print(f' -- 跳过此文件并继续')
+                    # 清理临时文件
                     try:
-                        import py7zr
-                    except ImportError:
-                        raise ImportError('py7zr is required for .7z archives. Install it with: pip install py7zr')
-                    
-                    os.makedirs(extracted_path, exist_ok=True)
-                    with py7zr.SevenZipFile(download_path, mode='r') as archive:
-                        archive.extractall(path=extracted_path)
-                else:
-                    shutil.unpack_archive(download_path, extracted_path)
+                        if os.path.exists(download_path):
+                            os.remove(download_path)
+                        if os.path.exists(extracted_path):
+                            shutil.rmtree(extracted_path)
+                    except Exception:
+                        pass
+                    continue
 
                 def get_real_archive_files():
                     archive_files = []

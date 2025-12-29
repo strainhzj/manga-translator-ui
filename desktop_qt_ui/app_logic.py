@@ -898,6 +898,7 @@ class MainAppLogic(QObject):
                     "last_output_path": self._t("label_last_output_path"),
                     "save_to_source_dir": self._t("label_save_to_source_dir"),
                     "psd_font": self._t("label_psd_font"),
+                    "psd_script_only": self._t("label_psd_script_only"),
                     "line_spacing": self._t("label_line_spacing"),
                     "font_size": self._t("label_font_size"),
                     "OPENAI_API_KEY": self._t("label_OPENAI_API_KEY"),

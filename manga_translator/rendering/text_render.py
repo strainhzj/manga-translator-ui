@@ -561,7 +561,7 @@ def calc_vertical(font_size: int, text: str, max_height: int, config=None):
 
     return line_text_list, line_height_list
 
-def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int, config=None, line_width: int = 0, force_rotate_90: bool = False):
+def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int, config=None, line_width: int = 0, force_rotate_90: bool = False, stroke_width: float = None):
     if cdpt == '＿':
         # For the placeholder, just advance the pen vertically and do nothing else.
         return font_size
@@ -639,8 +639,11 @@ def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_
     if border_size > 0:
         glyph_border = get_char_border(cdpt, font_size, 1)
         stroker = freetype.Stroker()
-        # Get stroke width from config, default to 0.07 if not specified
-        stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+        # Use passed stroke_width, fallback to config or default
+        if stroke_width is None:
+            stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+        else:
+            stroke_ratio = stroke_width
         stroke_radius = 64 * max(int(stroke_ratio * font_size), 1)
         stroker.set(stroke_radius, freetype.FT_STROKER_LINEJOIN_ROUND, freetype.FT_STROKER_LINECAP_ROUND, 0)
         glyph_border.stroke(stroker, destroy=True)
@@ -684,7 +687,7 @@ def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_
                         logger.warning(f"Shape mismatch: target={{target_slice.shape}}, source={{bitmap_border_slice.shape}}")
     return char_offset_y  
 
-def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tuple[int, int, int], bg: Optional[Tuple[int, int, int]], line_spacing: int, config=None, region_count: int = 1):
+def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tuple[int, int, int], bg: Optional[Tuple[int, int, int]], line_spacing: int, config=None, region_count: int = 1, stroke_width: float = None):
 
     # 应用最大字体限制
     if config and hasattr(config.render, 'max_font_size') and config.render.max_font_size > 0:
@@ -696,10 +699,15 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
     if not text:
         return
 
-    # Get stroke width from config, default to 0.07 if not specified
-    stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+    # 初始化 stroke_ratio，避免 UnboundLocalError
+    if stroke_width is None:
+        stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+    else:
+        stroke_ratio = stroke_width
     bg_size = int(max(font_size * stroke_ratio, 1)) if bg is not None else 0
-    spacing_x = int(font_size * (line_spacing or 0.2))
+    # line_spacing 是基本间距的倍率
+    # 竖排基本间距: 0.2
+    spacing_x = int(font_size * 0.2 * (line_spacing or 1.0))
 
     # Conditional wrapping logic based on disable_auto_wrap and region_count
     # 检测文本中是否有BR标记或换行符
@@ -712,9 +720,14 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
             effective_max_height = 99999
             logger.debug(f"[VERTICAL DEBUG] AI断句开启且有BR标记，effective_max_height=99999, region_count={region_count}")
         else:
-            # AI断句开启但没有BR标记，回退到自动换行模式
-            effective_max_height = h
-            logger.debug(f"[VERTICAL DEBUG] AI断句开启但无BR标记，回退自动换行，effective_max_height={h}, region_count={region_count}")
+            # AI断句开启但没有BR标记，根据 layout_mode 回退
+            if config.render.layout_mode == 'smart_scaling' and region_count <= 1:
+                effective_max_height = 99999
+                logger.debug(f"[VERTICAL DEBUG] AI断句开启但无BR标记，回退Smart Scaling，effective_max_height=99999, region_count={region_count}")
+            else:
+                # 回退到自动换行模式
+                effective_max_height = h
+                logger.debug(f"[VERTICAL DEBUG] AI断句开启但无BR标记，回退自动换行，effective_max_height={h}, region_count={region_count}")
     elif config and config.render.layout_mode == 'smart_scaling':
         # smart_scaling 模式下，检查是否有换行符
         if has_br:
@@ -824,7 +837,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
                     for char_r in content:
                         if char_r == '！': char_r = '!'
                         elif char_r == '？': char_r = '?'
-                        offset_x = put_char_horizontal(r_font_size, char_r, pen_r, temp_canvas_text, temp_canvas_border, border_size=bg_size, config=config)
+                        offset_x = put_char_horizontal(r_font_size, char_r, pen_r, temp_canvas_text, temp_canvas_border, border_size=bg_size, config=config, stroke_width=stroke_ratio)
                         pen_r[0] += offset_x
                     
                     # 旋转90度（顺时针）
@@ -892,7 +905,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
                     for char_h in content:
                         if char_h == '！': char_h = '!'
                         elif char_h == '？': char_h = '?'
-                        offset_x = put_char_horizontal(h_font_size, char_h, pen_h, temp_canvas_text, temp_canvas_border, border_size=bg_size, config=config)
+                        offset_x = put_char_horizontal(h_font_size, char_h, pen_h, temp_canvas_text, temp_canvas_border, border_size=bg_size, config=config, stroke_width=stroke_ratio)
                         pen_h[0] += offset_x
 
                     combined_temp = cv2.add(temp_canvas_text, temp_canvas_border)
@@ -959,7 +972,7 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
 
             else: # It's a vertical part
                 for char_idx, c in enumerate(part):
-                    offset_y = put_char_vertical(font_size, c, pen_line, canvas_text, canvas_border, border_size=bg_size, config=config, line_width=line_width)
+                    offset_y = put_char_vertical(font_size, c, pen_line, canvas_text, canvas_border, border_size=bg_size, config=config, line_width=line_width, stroke_width=stroke_ratio)
                     pen_line[1] += offset_y
         
         # 使用实际列宽而不是固定的font_size来计算下一列的位置
@@ -1326,7 +1339,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
 
     return line_text_list, line_width_list
 
-def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int, config=None):
+def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int, config=None, stroke_width: float = None):
     if cdpt == '＿':
         # For the placeholder, just advance the pen and do nothing else.
         return get_char_offset_x(font_size, '＿')
@@ -1382,8 +1395,11 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
     if border_size > 0:
         glyph_border = get_char_border(cdpt, font_size, 0)
         stroker = freetype.Stroker()
-        # Get stroke width from config, default to 0.07 if not specified
-        stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+        # Use passed stroke_width, fallback to config or default
+        if stroke_width is None:
+            stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+        else:
+            stroke_ratio = stroke_width
         stroke_radius = 64 * max(int(stroke_ratio * font_size), 1)
         stroker.set(stroke_radius, 
                    freetype.FT_STROKER_LINEJOIN_ROUND,
@@ -1445,7 +1461,7 @@ def is_cjk_lang(lang: str):
 
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
-                        lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0, config=None, region_count: int = 1):
+                        lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0, config=None, region_count: int = 1, stroke_width: float = None):
 
     # 应用最大字体限制
     if config and hasattr(config.render, 'max_font_size') and config.render.max_font_size > 0:
@@ -1460,6 +1476,12 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     if config:
         layout_mode = config.render.layout_mode
 
+    # 初始化 stroke_ratio，避免 UnboundLocalError
+    if stroke_width is None:
+        stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
+    else:
+        stroke_ratio = stroke_width
+    
     # 当AI断句开启时，统一处理换行符并使用无限宽度
     if config and config.render.disable_auto_wrap:
         # 统一处理所有类型的AI换行符
@@ -1482,11 +1504,10 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
                 logger.debug(f"[HORIZONTAL DEBUG] Smart scaling多区域无换行符，width={width}, region_count={region_count}")
         else:
             logger.debug(f"[HORIZONTAL DEBUG] Smart scaling有换行符，width={width}, region_count={region_count}, line_count={text.count(chr(10))+1}")
-
-    # Get stroke width from config, default to 0.07 if not specified
-    stroke_ratio = config.render.stroke_width if (config and hasattr(config.render, 'stroke_width')) else 0.07
     bg_size = int(max(font_size * stroke_ratio, 1)) if bg is not None else 0
-    spacing_y = int(font_size * (line_spacing or 0.01))
+    # line_spacing 是基本间距的倍率
+    # 横排基本间距: 0.01
+    spacing_y = int(font_size * 0.01 * (line_spacing or 1.0))
     if layout_mode != 'default' and is_cjk_lang(lang):
         line_text_list, line_width_list = calc_horizontal_cjk(font_size, text, width)
     else:
@@ -1520,7 +1541,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
                 glyph = get_char_glyph(cdpt, font_size, 0)
                 offset_x = glyph.metrics.horiAdvance >> 6
                 pen_line[0] -= offset_x
-            offset_x = put_char_horizontal(font_size, c, pen_line, canvas_text, canvas_border, border_size=bg_size, config=config)
+            offset_x = put_char_horizontal(font_size, c, pen_line, canvas_text, canvas_border, border_size=bg_size, config=config, stroke_width=stroke_ratio)
             if not reversed_direction:
                 pen_line[0] += offset_x
         pen_orig[1] += spacing_y + font_size

@@ -130,8 +130,8 @@ def full_memory_cleanup(log_callback=None):
     
     # log("--- [CLEANUP] 开始完整内存清理...")
     
-    # 1. 清理模型缓存
-    result['caches_cleared'] = cleanup_all_model_caches()
+    # 1. 清理模型缓存 - 已禁用，保留模型在内存中以提高后续翻译速度
+    # result['caches_cleared'] = cleanup_all_model_caches()
     # if result['caches_cleared'] > 0:
     #     log(f"--- [CLEANUP] 已清理 {result['caches_cleared']} 个模型缓存")
     

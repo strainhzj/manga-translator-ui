@@ -102,7 +102,7 @@ def split_text_region(
 #     box = np.array(box)
 #     return box
 
-def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height, debug=False, edge_ratio_threshold=0.0):
+def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height, debug=False, edge_ratio_threshold=0.0, config=None):
     # step 0: merge quadrilaterals that belong to the same textline
     # u = 0
     # removed_counter = 0
@@ -225,7 +225,7 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, conf
     edge_ratio_threshold = getattr(config.ocr, 'merge_edge_ratio_threshold', 0.0)
     text_regions: List[TextBlock] = []
     
-    for idx, (txtlns, fg_color, bg_color) in enumerate(merge_bboxes_text_region(textlines, width, height, debug=debug, edge_ratio_threshold=edge_ratio_threshold)):
+    for idx, (txtlns, fg_color, bg_color) in enumerate(merge_bboxes_text_region(textlines, width, height, debug=debug, edge_ratio_threshold=edge_ratio_threshold, config=config)):
         # --- 在创建TextBlock之前进行去重 ---
         unique_txtlns = []
         seen_coords = set()
@@ -266,8 +266,14 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, conf
         
         lines = [txtln.pts for txtln in unique_txtlns]
         texts = [txtln.text for txtln in unique_txtlns]
+        
+        # 从配置中获取描边宽度
+        stroke_width = 0.07
+        if config and hasattr(config, 'render') and hasattr(config.render, 'stroke_width'):
+            stroke_width = config.render.stroke_width
+        
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
-                           fg_color=fg_color, bg_color=bg_color)
+                           fg_color=fg_color, bg_color=bg_color, default_stroke_width=stroke_width)
         text_regions.append(region)
     
     return text_regions

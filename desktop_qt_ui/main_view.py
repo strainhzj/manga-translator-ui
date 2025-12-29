@@ -607,7 +607,7 @@ class MainView(QWidget):
                     widget.setPlaceholderText(self._t("Default: 400"))
                     widget.editingFinished.connect(lambda k=full_key, w=widget: self._on_numeric_input_changed(w.text(), k, int))
                 elif key == 'line_spacing':
-                    widget.setPlaceholderText(self._t("Horizontal default: 0.01, Vertical default: 0.2"))
+                    widget.setPlaceholderText(self._t("Default: 1.0 (multiplier for base spacing)"))
                     widget.editingFinished.connect(lambda k=full_key, w=widget: self._on_numeric_input_changed(w.text(), k, float))
                 elif key == 'font_size':
                     widget.setPlaceholderText(self._t("Auto"))

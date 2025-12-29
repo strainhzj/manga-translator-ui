@@ -149,6 +149,38 @@ class PermissionService:
         
         return filtered
     
+    def check_offline_translation_permission(self, username: str) -> bool:
+        """
+        检查用户是否有离线翻译权限（用户离线后任务继续执行）
+        
+        Args:
+            username: 用户名
+        
+        Returns:
+            bool: 是否允许离线翻译
+        """
+        account = self.account_service.get_user(username)
+        if not account:
+            logger.warning(f"User not found: {username}")
+            return False
+        
+        # 检查用户权限
+        if account.permissions.allow_offline_translation:
+            return True
+        
+        # 检查用户组权限
+        try:
+            from manga_translator.server.core.group_management_service import get_group_management_service
+            group_service = get_group_management_service()
+            group = group_service.get_group(account.group)
+            
+            if group:
+                return group.get('allow_offline_translation', False)
+        except Exception as e:
+            logger.warning(f"Failed to get group offline translation permission: {e}")
+        
+        return False
+    
     def check_concurrent_limit(self, username: str) -> bool:
         """
         检查并发限制
