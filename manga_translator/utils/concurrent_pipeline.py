@@ -573,7 +573,7 @@ class ConcurrentPipeline:
                     ctx.img_rendered = await loop.run_in_executor(self.executor, render_func)
                     
                     # 使用dump_image合并alpha通道（与标准流程一致）
-                    from .utils.generic import dump_image
+                    from .generic import dump_image
                     ctx.result = dump_image(ctx.input, ctx.img_rendered, ctx.img_alpha)
                 
                 self.stats['rendering'] += 1
