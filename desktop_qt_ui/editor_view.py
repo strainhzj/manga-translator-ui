@@ -211,6 +211,8 @@ class EditorView(QWidget):
         self.model.selection_changed.connect(self.region_list_view.update_selection)
         # Connect model selection changes to the property panel
         self.model.selection_changed.connect(self.property_panel.on_selection_changed)
+        # Connect model brush size changes to the property panel
+        self.model.brush_size_changed.connect(self.property_panel.sync_brush_size_from_model)
 
         # --- View to Controller ---
         self.region_list_view.region_selected.connect(self.controller.set_selection_from_list)

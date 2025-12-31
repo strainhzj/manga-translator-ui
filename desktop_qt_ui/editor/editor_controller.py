@@ -1132,6 +1132,85 @@ class EditorController(QObject):
         )
         self.execute_command(command)
 
+    def scale_region(self, region_index: int, scale_factor: float):
+        """等比例缩放整个文本框（包括框的大小和字体）"""
+        from .desktop_ui_geometry import get_polygon_center
+        
+        old_region_data = self._get_region_by_index(region_index)
+        if not old_region_data:
+            return
+
+        new_region_data = copy.deepcopy(old_region_data)
+        
+        # 缩放字体大小
+        old_font_size = old_region_data.get('font_size', 20)
+        new_font_size = max(8, min(200, int(old_font_size * scale_factor)))
+        new_region_data['font_size'] = new_font_size
+        
+        # 缩放 lines（文本框的边界）
+        if 'lines' in new_region_data and new_region_data['lines']:
+            # 计算当前 lines 的中心点（边界框中心）
+            all_points = []
+            for line in new_region_data['lines']:
+                all_points.extend(line)
+            
+            if all_points:
+                center_x, center_y = get_polygon_center(all_points)
+                
+                # 以中心点为基准缩放
+                scaled_lines = []
+                for line in new_region_data['lines']:
+                    scaled_line = []
+                    for point in line:
+                        px, py = point[0], point[1]
+                        # 相对于中心点的偏移
+                        offset_x = px - center_x
+                        offset_y = py - center_y
+                        # 缩放偏移
+                        new_offset_x = offset_x * scale_factor
+                        new_offset_y = offset_y * scale_factor
+                        # 加回中心点
+                        new_px = center_x + new_offset_x
+                        new_py = center_y + new_offset_y
+                        scaled_line.append([new_px, new_py])
+                    scaled_lines.append(scaled_line)
+                new_region_data['lines'] = scaled_lines
+        
+        # 缩放 polygons（如果存在）
+        if 'polygons' in new_region_data and new_region_data['polygons']:
+            # 计算当前 polygons 的中心点（边界框中心）
+            all_points = []
+            for polygon in new_region_data['polygons']:
+                all_points.extend(polygon)
+            
+            if all_points:
+                center_x, center_y = get_polygon_center(all_points)
+                
+                # 以中心点为基准缩放
+                scaled_polygons = []
+                for polygon in new_region_data['polygons']:
+                    scaled_polygon = []
+                    for point in polygon:
+                        px, py = point[0], point[1]
+                        offset_x = px - center_x
+                        offset_y = py - center_y
+                        new_offset_x = offset_x * scale_factor
+                        new_offset_y = offset_y * scale_factor
+                        new_px = center_x + new_offset_x
+                        new_py = center_y + new_offset_y
+                        scaled_polygon.append([new_px, new_py])
+                    scaled_polygons.append(scaled_polygon)
+                new_region_data['polygons'] = scaled_polygons
+        
+        command = UpdateRegionCommand(
+            model=self.model,
+            region_index=region_index,
+            old_data=old_region_data,
+            new_data=new_region_data,
+            description=f"Scale Region {region_index}"
+        )
+        self.execute_command(command)
+
     @pyqtSlot(int, str)
     def update_font_color(self, region_index: int, color: str):
         old_region_data = self._get_region_by_index(region_index)

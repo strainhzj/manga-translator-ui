@@ -210,9 +210,9 @@ class PropertyPanel(QWidget):
         self.brush_size_label = QLabel(self._t("Brush Size:"))
         brush_size_layout.addWidget(self.brush_size_label)
         self.brush_size_slider = QSlider(Qt.Orientation.Horizontal)
-        self.brush_size_slider.setRange(1, 100)
-        self.brush_size_label = QLabel("20")
-        self.brush_size_slider.setValue(20)
+        self.brush_size_slider.setRange(5, 200)
+        self.brush_size_label = QLabel("30")
+        self.brush_size_slider.setValue(30)
         brush_size_layout.addWidget(self.brush_size_slider)
         brush_size_layout.addWidget(self.brush_size_label)
         mask_layout.addLayout(brush_size_layout)
@@ -1229,6 +1229,14 @@ class PropertyPanel(QWidget):
     def _on_brush_size_changed(self, value):
         self.brush_size_label.setText(str(value))
         self.brush_size_changed.emit(value)
+
+    def sync_brush_size_from_model(self, size: int):
+        """从模型同步画笔大小到UI（不触发信号）"""
+        # 阻止信号，避免循环触发
+        self.brush_size_slider.blockSignals(True)
+        self.brush_size_slider.setValue(size)
+        self.brush_size_label.setText(str(size))
+        self.brush_size_slider.blockSignals(False)
 
     def _on_alignment_changed(self, text: str):
         if self.current_region_index != -1:

@@ -132,6 +132,7 @@ class EditorShortcutManager(ShortcutManager):
         self.editor_view = editor_view
         self.controller = editor_view.controller
         self._setup_editor_shortcuts()
+        self._setup_wheel_shortcuts()
     
     def _setup_editor_shortcuts(self):
         """设置编辑器的所有快捷键"""
@@ -368,3 +369,53 @@ class EditorShortcutManager(ShortcutManager):
         else:
             if hasattr(self.editor_view, 'file_list'):
                 self.editor_view.file_list.select_next_image()
+
+    def _setup_wheel_shortcuts(self):
+        """设置鼠标滚轮快捷键（通过事件过滤器实现）"""
+        # 为 graphics_view 的 viewport 安装事件过滤器
+        if hasattr(self.editor_view, 'graphics_view'):
+            # 滚轮事件会先到达 viewport
+            self.editor_view.graphics_view.viewport().installEventFilter(self)
+    
+    def eventFilter(self, obj, event):
+        """
+        事件过滤器，用于处理鼠标滚轮快捷键
+        
+        支持的快捷键：
+        - Ctrl + 滚轮：等比例缩放选中文本框（包括框的大小和字体）
+        - Shift + 滚轮：调整蒙版画笔大小
+        """
+        if event.type() == QEvent.Type.Wheel:
+            # 检查是否是 graphics_view 的 viewport
+            if obj == self.editor_view.graphics_view.viewport():
+                modifiers = event.modifiers()
+                
+                # Shift + 滚轮：调整画笔大小（无论当前是什么工具）
+                if modifiers == Qt.KeyboardModifier.ShiftModifier:
+                    current_size = self.editor_view.model.get_brush_size()
+                    # 尝试获取滚轮方向
+                    angle_delta = event.angleDelta().y()
+                    if angle_delta == 0:
+                        angle_delta = event.pixelDelta().y()
+                    
+                    delta = 1 if angle_delta > 0 else -1
+                    new_size = max(5, min(200, current_size + delta))
+                    self.controller.set_brush_size(new_size)
+                    return True  # 阻止事件继续传递
+                
+                # Ctrl + 滚轮：等比例缩放选中文本框（包括框的大小和字体）
+                elif modifiers == Qt.KeyboardModifier.ControlModifier:
+                    selected_regions = self.editor_view.model.get_selection()
+                    if selected_regions:
+                        # 有选中区域：缩放文本框
+                        # 尝试获取滚轮方向
+                        angle_delta = event.angleDelta().y()
+                        if angle_delta == 0:
+                            angle_delta = event.pixelDelta().y()
+                        scale_factor = 1.05 if angle_delta > 0 else 1.0 / 1.05
+                        for region_index in selected_regions:
+                            self.controller.scale_region(region_index, scale_factor)
+                        return True  # 阻止事件继续传递
+        
+        # 其他事件继续传递
+        return super().eventFilter(obj, event)
