@@ -148,6 +148,13 @@ class ModelWrapper(ABC):
             try:
                 if i > 0:
                     print(f' -- Trying fallback URL {i}: "{current_url}"')
+                    # 切换到备用链接时，清除之前下载的残留文件
+                    if os.path.exists(path):
+                        print(f' -- Removing incomplete download: "{path}"')
+                        os.remove(path)
+                    if os.path.exists(path + '.part'):
+                        print(f' -- Removing incomplete download: "{path}.part"')
+                        os.remove(path + '.part')
                 else:
                     print(f' -- Downloading: "{current_url}"')
                 download_url_with_progressbar(current_url, path)

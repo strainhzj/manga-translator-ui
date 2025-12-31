@@ -225,7 +225,7 @@ def get_filename_from_url(url: str, default: str = '') -> str:
         return m.group(1)
     return default
 
-def download_url_with_progressbar(url: str, path: str, min_speed_kbps: float = 100, speed_check_interval: int = 10):
+def download_url_with_progressbar(url: str, path: str, min_speed_kbps: float = 100, speed_check_interval: int = 10, timeout: int = 30):
     """
     下载文件并显示进度条
     
@@ -234,6 +234,7 @@ def download_url_with_progressbar(url: str, path: str, min_speed_kbps: float = 1
         path: 保存路径
         min_speed_kbps: 最低速度要求（KB/s），低于此速度会抛出异常
         speed_check_interval: 速度检查间隔（秒）
+        timeout: 连接超时时间（秒）
     """
     if os.path.basename(path) in ('.', '') or os.path.isdir(path):
         new_filename = get_filename_from_url(url)
@@ -248,10 +249,10 @@ def download_url_with_progressbar(url: str, path: str, min_speed_kbps: float = 1
         headers['Range'] = 'bytes=%d-' % downloaded_size
         headers['Accept-Encoding'] = 'deflate'
 
-    r = requests.get(url, stream=True, allow_redirects=True, headers=headers)
+    r = requests.get(url, stream=True, allow_redirects=True, headers=headers, timeout=timeout)
     if downloaded_size and r.headers.get('Accept-Ranges') != 'bytes':
         print('Error: Webserver does not support partial downloads. Restarting from the beginning.')
-        r = requests.get(url, stream=True, allow_redirects=True)
+        r = requests.get(url, stream=True, allow_redirects=True, timeout=timeout)
         downloaded_size = 0
     total = int(r.headers.get('content-length', 0))
     chunk_size = 1024
