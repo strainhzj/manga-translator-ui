@@ -513,7 +513,9 @@ class PropertyPanel(QWidget):
         self.mask_kernel_size_entry.setText(str(config_dict.get("kernel_size", 3)))
         
         ocr_settings = config_dict.get("ocr", {})
-        self.ignore_bubble_checkbox.setChecked(ocr_settings.get("ignore_bubble", False))
+        # ignore_bubble 是 float (0-1)，转换为 bool：0 = False, >0 = True
+        ignore_bubble_value = ocr_settings.get("ignore_bubble", 0.0)
+        self.ignore_bubble_checkbox.setChecked(bool(ignore_bubble_value > 0))
 
         # Unblock signals
         self.mask_dilation_offset_entry.blockSignals(False)
@@ -528,7 +530,7 @@ class PropertyPanel(QWidget):
             # 读取配置中的蒙版参数
             mask_dilation_offset = getattr(config, 'mask_dilation_offset', 70)
             kernel_size = getattr(config, 'kernel_size', 3)
-            ignore_bubble = getattr(config.ocr, 'ignore_bubble', False) if hasattr(config, 'ocr') else False
+            ignore_bubble = getattr(config.ocr, 'ignore_bubble', 0.0) if hasattr(config, 'ocr') else 0.0
 
             # 更新UI控件
             self.mask_dilation_offset_entry.blockSignals(True)
@@ -537,7 +539,8 @@ class PropertyPanel(QWidget):
 
             self.mask_dilation_offset_entry.setText(str(mask_dilation_offset))
             self.mask_kernel_size_entry.setText(str(kernel_size))
-            self.ignore_bubble_checkbox.setChecked(ignore_bubble)
+            # ignore_bubble 是 float (0-1)，转换为 bool：0 = False, >0 = True
+            self.ignore_bubble_checkbox.setChecked(bool(ignore_bubble > 0))
 
             self.mask_dilation_offset_entry.blockSignals(False)
             self.mask_kernel_size_entry.blockSignals(False)

@@ -11,7 +11,7 @@
   "kernel_size": 3,
   "mask_dilation_offset": 50,
   "translator": {
-    "translator": "openai",
+    "translator": "original",
     "target_lang": "CHS",
     "no_text_lang_skip": false,
     "high_quality_prompt_path": "dict/prompt_example.json",
@@ -25,7 +25,7 @@
     "use_hybrid_ocr": false,
     "secondary_ocr": "mocr",
     "min_text_length": 0,
-    "ignore_bubble": 0,
+    "ignore_bubble": 0.0,
     "prob": 0.1,
     "merge_gamma": 0.8,
     "merge_sigma": 2.5,
@@ -114,6 +114,7 @@
     "save_to_source_dir": false,
     "export_editable_psd": false,
     "psd_font": null,
-    "psd_script_only": false
+    "psd_script_only": false,
+    "replace_translation": false
   }
 }

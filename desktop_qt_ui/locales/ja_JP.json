@@ -101,6 +101,7 @@
   "label_optimize_line_breaks": "AI改行でテキストを自動拡大",
   "label_check_br_and_retry": "AI改行チェック",
   "label_strict_smart_scaling": "AI改行でテキストを自動拡大する際にテキストボックスを拡大しない",
+  "label_enable_template_alignment": "直接貼り付けモードを有効化",
   "label_direction": "テキスト方向",
   "label_uppercase": "大文字",
   "label_lowercase": "小文字",

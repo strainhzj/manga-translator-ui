@@ -101,6 +101,7 @@
   "label_optimize_line_breaks": "Expandir texto automáticamente con salto de línea AI",
   "label_check_br_and_retry": "Verificación de salto de línea AI",
   "label_strict_smart_scaling": "No expandir cuadro de texto al expandir texto automáticamente con salto de línea AI",
+  "label_enable_template_alignment": "Activar modo de pegado directo",
   "label_direction": "Dirección del texto",
   "label_uppercase": "Mayúsculas",
   "label_lowercase": "Minúsculas",

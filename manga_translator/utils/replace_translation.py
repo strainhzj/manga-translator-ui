@@ -88,6 +88,7 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
                 ctx.input = image
                 ctx.image_name = image_name
                 ctx.text_regions = []
+                ctx.success = False
                 results.append(ctx)
                 continue
             
@@ -100,6 +101,7 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             
             if not raw_ctx.text_regions:
                 logger.warning(f"  [跳过] 生肉图未检测到文本区域")
+                raw_ctx.success = False
                 results.append(raw_ctx)
                 continue
             
@@ -110,6 +112,7 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             
             if not raw_regions_filtered:
                 logger.warning(f"  [跳过] 过滤后无有效区域")
+                raw_ctx.success = False
                 results.append(raw_ctx)
                 continue
             
@@ -126,6 +129,7 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             
             if not translated_ctx.text_regions:
                 logger.warning(f"  [跳过] 翻译图未检测到文本区域")
+                raw_ctx.success = False
                 results.append(raw_ctx)
                 continue
             
@@ -145,30 +149,6 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             # 将翻译图区域缩放到生肉图尺寸
             scaled_trans_regions = scale_regions_to_target(trans_regions_filtered, trans_size, raw_size)
             
-            # 可选：模板匹配对齐
-            horizontal_offset = 0
-            vertical_offset = 0
-            if config.render.enable_template_alignment:
-                logger.info(f"    [对齐] 启用模板匹配对齐模式")
-                template_size = getattr(config.render, 'template_size', 440)
-                
-                # 计算偏移量
-                horizontal_offset, vertical_offset = calculate_template_alignment_offset(
-                    raw_ctx.img_rgb,
-                    translated_ctx.img_rgb,
-                    template_size=template_size
-                )
-                
-                # 对翻译区域应用偏移
-                if horizontal_offset != 0 or vertical_offset != 0:
-                    logger.info(f"    [对齐] 应用偏移量到翻译区域...")
-                    scaled_trans_regions = apply_alignment_offset_to_regions(
-                        scaled_trans_regions,
-                        horizontal_offset,
-                        vertical_offset,
-                        (raw_ctx.img_rgb.shape[0], raw_ctx.img_rgb.shape[1])
-                    )
-            
             # 执行匹配（使用以小框为基准的重叠率）
             matches = match_regions(raw_regions_filtered, scaled_trans_regions, iou_threshold=0.3)
             logger.info(f"    匹配结果: {len(matches)} 对区域 (重叠率 >= 0.3, 以小框为基准)")
@@ -178,8 +158,18 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
                 raw_regions_filtered, scaled_trans_regions, matches
             )
             
-            # 用于修复的区域使用生肉框（生成mask）
-            inpaint_regions = [raw_regions_filtered[i] for i in sorted(matched_raw_indices)]
+            # 用于修复的区域：只使用翻译框对应的生肉框（去重）
+            # 这样可以避免修复那些在生肉图中存在但翻译图中不存在的区域
+            inpaint_raw_indices = set()
+            for raw_idx, trans_idx, overlap in matches:
+                inpaint_raw_indices.add(raw_idx)
+            inpaint_regions = [raw_regions_filtered[i] for i in sorted(inpaint_raw_indices)]
+            
+            # 找出未被匹配的生肉区域（这些不应该被修复）
+            all_raw_indices = set(range(len(raw_regions_filtered)))
+            unmatched_raw_indices = all_raw_indices - inpaint_raw_indices
+            if unmatched_raw_indices:
+                logger.info(f"    [未匹配] {len(unmatched_raw_indices)} 个生肉区域未匹配，不会被修复: {sorted(unmatched_raw_indices)}")
             
             logger.info(f"    最终区域: {len(matched_regions)} 个 (用于渲染), {len(inpaint_regions)} 个 (用于修复)")
 
@@ -245,19 +235,14 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
                     import traceback
                     traceback.print_exc()
             
-            # === 步骤5: 修复和渲染 ===
-            logger.info(f"  [4/4] 修复+渲染...")
+            # === 步骤5: 修复生肉图 ===
+            logger.info(f"  [4/4] 修复生肉图...")
             
-            # 更新 context 的 text_regions 为匹配后的区域
-            raw_ctx.text_regions = matched_regions
-            
-            # 执行修复（使用生肉区域）
             # 临时替换 text_regions 为修复区域
             original_regions = raw_ctx.text_regions
             raw_ctx.text_regions = inpaint_regions
             
-            # ✅ Fix: 在inpainting前生成新的 mask，解决 NoneType 错误
-            # 使用当前的 inpaint_regions 生成适合修复的 mask
+            # 生成修复蒙版
             logger.info("    Generating mask for inpainting...")
             raw_ctx.mask = await translator._run_mask_refinement(config, raw_ctx)
             
@@ -267,14 +252,39 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             # 标记蒙版已优化，保存JSON时会设置 mask_is_refined=True
             raw_ctx.mask_is_refined = True
             
+            # 执行修复
             raw_ctx.img_inpainted = await translator._run_inpainting(config, raw_ctx)
-            raw_ctx.text_regions = original_regions  # 恢复渲染区域
+            raw_ctx.text_regions = original_regions  # 恢复区域列表
             
-            # 执行渲染
-            img_rendered = await translator._run_text_rendering(config, raw_ctx)
-            
-            # 使用 dump_image 将渲染后的 numpy 数组转换为 PIL Image
-            raw_ctx.result = dump_image(raw_ctx.input, img_rendered, getattr(raw_ctx, 'img_alpha', None))
+            # === 步骤6: 渲染或粘贴 ===
+            # 检查是否启用直接粘贴模式
+            if config.render.enable_template_alignment:
+                logger.info(f"  [5/5] 直接粘贴模式 - 从翻译图裁剪区域并粘贴到修复后的生肉图")
+                
+                # 使用修复后的图像作为基础，从翻译图粘贴文字
+                result_img = paste_regions_from_translated_image(
+                    raw_ctx.img_inpainted,  # 使用修复后的图像
+                    translated_ctx.img_rgb,
+                    raw_regions_filtered,
+                    scaled_trans_regions,
+                    matches
+                )
+                
+                # 使用 dump_image 将结果转换为 PIL Image
+                raw_ctx.result = dump_image(raw_ctx.input, result_img, getattr(raw_ctx, 'img_alpha', None))
+                
+            else:
+                # 原有逻辑：OCR + 重新渲染
+                logger.info(f"  [5/5] 渲染模式 - 使用 OCR 结果重新渲染文字")
+                
+                # 更新 context 的 text_regions 为匹配后的区域
+                raw_ctx.text_regions = matched_regions
+                
+                # 执行渲染
+                img_rendered = await translator._run_text_rendering(config, raw_ctx)
+                
+                # 使用 dump_image 将渲染后的 numpy 数组转换为 PIL Image
+                raw_ctx.result = dump_image(raw_ctx.input, img_rendered, getattr(raw_ctx, 'img_alpha', None))
             
             # === 步骤6: 保存结果 ===
             if save_info:
@@ -295,31 +305,46 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
                         image_to_save.save(final_output_path, quality=translator.save_quality)
                         logger.info(f"  -> 已保存: {os.path.basename(final_output_path)}")
                         
-                        # 保存修复后的图片（inpainted）到新目录结构
-                        # 与正常翻译流程保持一致
-                        if translator.save_text and hasattr(raw_ctx, 'img_inpainted') and raw_ctx.img_inpainted is not None:
-                            translator._save_inpainted_image(image_name, raw_ctx.img_inpainted)
+                        # 标记成功
+                        raw_ctx.success = True
                         
-                        # 保存翻译数据JSON
-                        if translator.save_text:
-                            translator._save_text_to_file(image_name, raw_ctx, config)
+                        # 只有在非直接粘贴模式下才保存 inpainted 和 JSON
+                        if not config.render.enable_template_alignment:
+                            # 保存修复后的图片（inpainted）到新目录结构
+                            # 与正常翻译流程保持一致
+                            if translator.save_text and hasattr(raw_ctx, 'img_inpainted') and raw_ctx.img_inpainted is not None:
+                                translator._save_inpainted_image(image_name, raw_ctx.img_inpainted)
+                            
+                            # 保存翻译数据JSON
+                            if translator.save_text:
+                                translator._save_text_to_file(image_name, raw_ctx, config)
+                        else:
+                            logger.info(f"  -> [直接粘贴模式] 跳过保存 JSON 和 inpainted 图片")
                         
                         # 导出可编辑PSD（如果启用）
                         if hasattr(config, 'cli') and hasattr(config.cli, 'export_editable_psd') and config.cli.export_editable_psd:
-                            try:
-                                from .photoshop_export import photoshop_export, get_psd_output_path
-                                psd_path = get_psd_output_path(image_name)
-                                cli_cfg = getattr(config, 'cli', None)
-                                default_font = getattr(cli_cfg, 'psd_font', None)
-                                line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
-                                script_only = getattr(cli_cfg, 'psd_script_only', False)
-                                photoshop_export(psd_path, raw_ctx, default_font, image_name, translator.verbose, translator._result_path, line_spacing, script_only)
-                                logger.info(f"  -> ✅ [PSD] 已导出可编辑PSD: {os.path.basename(psd_path)}")
-                            except Exception as psd_err:
-                                logger.error(f"  导出PSD失败: {psd_err}")
+                            # 直接粘贴模式下也不导出 PSD（因为没有文本区域数据）
+                            if not config.render.enable_template_alignment:
+                                try:
+                                    from .photoshop_export import photoshop_export, get_psd_output_path
+                                    psd_path = get_psd_output_path(image_name)
+                                    cli_cfg = getattr(config, 'cli', None)
+                                    default_font = getattr(cli_cfg, 'psd_font', None)
+                                    line_spacing = getattr(config.render, 'line_spacing', None) if hasattr(config, 'render') else None
+                                    script_only = getattr(cli_cfg, 'psd_script_only', False)
+                                    photoshop_export(psd_path, raw_ctx, default_font, image_name, translator.verbose, translator._result_path, line_spacing, script_only)
+                                    logger.info(f"  -> ✅ [PSD] 已导出可编辑PSD: {os.path.basename(psd_path)}")
+                                except Exception as psd_err:
+                                    logger.error(f"  导出PSD失败: {psd_err}")
+                            else:
+                                logger.info(f"  -> [直接粘贴模式] 跳过导出 PSD")
                         
                 except Exception as save_err:
                     logger.error(f"  保存失败: {save_err}")
+                    raw_ctx.success = False
+            else:
+                # 没有 save_info 也标记成功（可能是预览模式）
+                raw_ctx.success = True
             
             results.append(raw_ctx)
             
@@ -330,6 +355,7 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             ctx.input = image
             ctx.image_name = image_name
             ctx.text_regions = []
+            ctx.success = False
             results.append(ctx)
     
     logger.info(f"Replace translation completed: {len(results)} images processed")
@@ -665,7 +691,7 @@ def calculate_template_alignment_offset(raw_img: np.ndarray,
     Args:
         raw_img: 生肉图（BGR格式）
         translated_img: 翻译图（BGR格式）
-        template_size: 模板大小（像素）
+        template_size: 模板大小（像素），如果为0则自动计算
         
     Returns:
         (horizontal_offset, vertical_offset)
@@ -681,14 +707,27 @@ def calculate_template_alignment_offset(raw_img: np.ndarray,
         
         zh, zw = translated_img.shape[:2]
         
+        # 自动计算模板大小（图像短边的1/3到1/2之间）
+        if template_size <= 0:
+            min_side = min(zh, zw)
+            template_size = min(max(min_side // 3, 200), min_side // 2)
+            logger.info(f"    [对齐] 自动计算模板大小: {template_size} 像素 (图像尺寸: {zw}x{zh})")
+        
         # 从翻译图中心提取模板
         cenx = zw // 2 - template_size // 2
         ceny = zh // 2 - template_size // 2
         
         # 确保模板不超出边界
         if cenx < 0 or ceny < 0 or cenx + template_size > zw or ceny + template_size > zh:
-            logger.warning(f"模板大小 {template_size} 超出图像尺寸 {zw}x{zh}，使用默认偏移 (0, 0)")
-            return (0, 0)
+            # 自动调整模板大小
+            max_template_size = min(zw, zh) - 20  # 留10像素边距
+            if max_template_size < 100:
+                logger.warning(f"图像尺寸 {zw}x{zh} 太小，无法进行模板匹配，使用默认偏移 (0, 0)")
+                return (0, 0)
+            template_size = max_template_size
+            cenx = zw // 2 - template_size // 2
+            ceny = zh // 2 - template_size // 2
+            logger.info(f"    [对齐] 自动调整模板大小为: {template_size} 像素")
         
         muban = translated_img[ceny:ceny + template_size, cenx:cenx + template_size]
         
@@ -724,81 +763,79 @@ def calculate_template_alignment_offset(raw_img: np.ndarray,
         return (0, 0)
 
 
-def apply_alignment_offset_to_regions(regions: List[TextBlock],
-                                      horizontal_offset: int,
-                                      vertical_offset: int,
-                                      img_shape: Tuple[int, int]) -> List[TextBlock]:
+def paste_regions_from_translated_image(raw_img: np.ndarray,
+                                        translated_img: np.ndarray,
+                                        raw_regions: List[TextBlock],
+                                        translated_regions: List[TextBlock],
+                                        matches: List[Tuple[int, int, float]]) -> np.ndarray:
     """
-    对区域应用对齐偏移量
+    根据匹配的区域，从翻译图裁剪并粘贴到生肉图
     
     Args:
-        regions: 区域列表
-        horizontal_offset: 水平偏移（>0 向左，<0 向右）
-        vertical_offset: 垂直偏移（>0 向上，<0 向下）
-        img_shape: 图像尺寸 (height, width)
+        raw_img: 生肉图（BGR格式）
+        translated_img: 翻译图（BGR格式）
+        raw_regions: 生肉图区域列表
+        translated_regions: 翻译图区域列表（已缩放到生肉图尺寸）
+        matches: 匹配结果 [(raw_idx, trans_idx, overlap), ...]
         
     Returns:
-        调整后的区域列表（新对象）
+        合成后的图像（BGR格式）
     """
-    import copy
-    
-    if horizontal_offset == 0 and vertical_offset == 0:
-        return regions
-    
-    img_h, img_w = img_shape
-    aligned_regions = []
-    
-    for region in regions:
-        new_region = copy.deepcopy(region)
+    try:
+        logger.info(f"    [粘贴] 开始从翻译图粘贴 {len(matches)} 个区域...")
         
-        # 创建新的坐标数组
-        if new_region.lines is not None:
-            new_lines = np.zeros_like(new_region.lines)
-            old_shape = new_region.lines.shape
-            
-            # 将 lines 展平为 (n_points, 2)
-            all_points = new_region.lines.reshape(-1, 2)
-            
-            # 应用偏移
-            # 注意：OpenCV 坐标系是 (x, y)，偏移量也是 (x, y)
-            # horizontal_offset > 0 表示向左移动，即 x 坐标减小
-            # vertical_offset > 0 表示向上移动，即 y 坐标减小
-            
-            for i, point in enumerate(all_points):
-                x, y = point
-                
-                # 计算新坐标
-                if vertical_offset > 0:  # 向上移
-                    new_y = y - vertical_offset
-                elif vertical_offset < 0:  # 向下移
-                    new_y = y - vertical_offset  # vertical_offset 是负数，所以是加
-                else:
-                    new_y = y
-                
-                if horizontal_offset > 0:  # 向左移
-                    new_x = x - horizontal_offset
-                elif horizontal_offset < 0:  # 向右移
-                    new_x = x - horizontal_offset  # horizontal_offset 是负数，所以是加
-                else:
-                    new_x = x
-                
-                # 限制在图像范围内
-                new_x = max(0, min(img_w - 1, new_x))
-                new_y = max(0, min(img_h - 1, new_y))
-                
-                all_points[i] = [new_x, new_y]
-            
-            # 恢复原始形状
-            new_region.lines = all_points.reshape(old_shape)
-            
-            # 清除缓存的属性
-            for attr in ['xyxy', 'xywh', 'center', 'unrotated_polygons', 'unrotated_min_rect', 'min_rect']:
-                if attr in new_region.__dict__:
-                    delattr(new_region, attr)
+        # 确保图像是BGR格式
+        if len(translated_img.shape) == 2:
+            translated_img = cv2.cvtColor(translated_img, cv2.COLOR_GRAY2BGR)
+        if len(raw_img.shape) == 2:
+            raw_img = cv2.cvtColor(raw_img, cv2.COLOR_GRAY2BGR)
         
-        aligned_regions.append(new_region)
-    
-    return aligned_regions
+        zh, zw = translated_img.shape[:2]
+        rh, rw = raw_img.shape[:2]
+        
+        # 如果尺寸不一致，缩放翻译图到生肉图尺寸
+        if zh != rh or zw != rw:
+            logger.info(f"    [粘贴] 缩放翻译图: {zw}x{zh} -> {rw}x{rh}")
+            translated_img = cv2.resize(translated_img, (rw, rh), interpolation=cv2.INTER_AREA)
+            zh, zw = rh, rw
+        
+        # 复制生肉图作为结果
+        result = raw_img.copy()
+        
+        # 遍历每个匹配的区域
+        for raw_idx, trans_idx, overlap in matches:
+            trans_region = translated_regions[trans_idx]
+            
+            # 获取翻译区域的外接矩形
+            x, y, w, h = get_bounding_rect(trans_region)
+            x, y, w, h = int(x), int(y), int(w), int(h)
+            
+            # 确保坐标在图像范围内
+            x = max(0, min(x, zw - 1))
+            y = max(0, min(y, zh - 1))
+            w = min(w, zw - x)
+            h = min(h, zh - y)
+            
+            if w <= 0 or h <= 0:
+                logger.warning(f"    [粘贴] 跳过无效区域 T{trans_idx}: w={w}, h={h}")
+                continue
+            
+            # 从翻译图裁剪这个区域
+            trans_patch = translated_img[y:y+h, x:x+w].copy()
+            
+            # 粘贴到生肉图的相同位置
+            result[y:y+h, x:x+w] = trans_patch
+            
+            logger.debug(f"    [粘贴] 区域 T{trans_idx}: ({x},{y}) {w}x{h}")
+        
+        logger.info(f"    [粘贴] 完成，共粘贴 {len(matches)} 个区域")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"    [粘贴] 粘贴失败: {e}")
+        traceback.print_exc()
+        return raw_img.copy()
 
 
 # 导出的函数和类
@@ -811,6 +848,5 @@ __all__ = [
     'match_regions',
     'create_matched_regions',
     'filter_raw_regions_for_inpainting',
-    'calculate_template_alignment_offset',
-    'apply_alignment_offset_to_regions',
+    'paste_regions_from_translated_image',
 ]

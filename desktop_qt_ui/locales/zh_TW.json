@@ -90,6 +90,7 @@
   "Stop Translation": "停止翻譯",
   "Stopping...": "停止中...",
   "label_check_br_and_retry": "AI断句檢查",
+  "label_enable_template_alignment": "啟用直接粘貼模式",
   "lang_FRA": "法语",
   "lang_ARA": "阿拉伯语",
   "label_detection_size": "偵測大小",

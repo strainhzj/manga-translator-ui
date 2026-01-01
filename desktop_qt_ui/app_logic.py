@@ -876,6 +876,7 @@ class MainAppLogic(QObject):
                     "optimize_line_breaks": self._t("label_optimize_line_breaks"),
                     "check_br_and_retry": self._t("label_check_br_and_retry"),
                     "strict_smart_scaling": self._t("label_strict_smart_scaling"),
+                    "enable_template_alignment": self._t("label_enable_template_alignment"),
                     "direction": self._t("label_direction"),
                     "uppercase": self._t("label_uppercase"),
                     "lowercase": self._t("label_lowercase"),
@@ -2601,7 +2602,6 @@ class TranslationWorker(QObject):
                 
                 self.log_received.emit(f"⚠️  并发流水线已禁用：当前模式 [{', '.join(incompatible_modes)}] 不支持并发处理")
                 batch_concurrent = False
-            
             if is_hq or (len(self.files) > 0 and batch_size > 1):
                 self.log_received.emit(f"--- 开始批量处理 ({'高质量模式' if is_hq else '批量模式'})")
 

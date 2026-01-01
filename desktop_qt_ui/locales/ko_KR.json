@@ -101,6 +101,7 @@
   "label_optimize_line_breaks": "AI 줄바꿈으로 텍스트 자동 확대",
   "label_check_br_and_retry": "AI 줄바꿈 확인",
   "label_strict_smart_scaling": "AI 줄바꿈으로 텍스트 자동 확대 시 텍스트 상자 확대 안 함",
+  "label_enable_template_alignment": "직접 붙여넣기 모드 활성화",
   "label_direction": "텍스트 방향",
   "label_uppercase": "대문자",
   "label_lowercase": "소문자",

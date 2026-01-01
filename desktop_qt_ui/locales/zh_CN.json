@@ -109,6 +109,7 @@
   "label_optimize_line_breaks": "AI断句自动扩大文字",
   "label_check_br_and_retry": "AI断句检查",
   "label_strict_smart_scaling": "AI断句自动扩大文字下不扩大文本框",
+  "label_enable_template_alignment": "启用直接粘贴模式",
   "label_direction": "文本方向",
   "label_uppercase": "大写",
   "label_lowercase": "小写",
