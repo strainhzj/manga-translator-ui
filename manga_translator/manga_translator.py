@@ -3173,7 +3173,10 @@ class MangaTranslator:
                             try:
                                 overwrite = save_info.get('overwrite', True)
                                 final_output_path = self._calculate_output_path(ctx.image_name, save_info)
+                                # 保存图片（可能实际保存或跳过已存在的文件）
                                 self._save_translated_image(ctx.result, final_output_path, ctx.image_name, overwrite, "BATCH")
+                                # ✅ 无论保存还是跳过，只要没有异常就标记成功
+                                ctx.success = True
                                 
                                 # 导出可编辑PSD（如果启用）
                                 if hasattr(config, 'cli') and hasattr(config.cli, 'export_editable_psd') and config.cli.export_editable_psd:

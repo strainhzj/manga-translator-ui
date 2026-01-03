@@ -33,7 +33,7 @@
   },
   "detector": {
     "detector": "default",
-    "detection_size": 2048.0,
+    "detection_size": 2048,
     "text_threshold": 0.5,
     "det_rotate": false,
     "det_auto_rotate": false,
@@ -84,7 +84,7 @@
   "upscale": {
     "upscaler": "mangajanai",
     "upscale_ratio": null,
-    "realcugan_model": "3x-denoise3x-pro",
+    "realcugan_model": "2x-denoise3x-pro",
     "tile_size": 600,
     "revert_upscaling": false
   },
@@ -116,6 +116,6 @@
     "export_editable_psd": false,
     "psd_font": null,
     "psd_script_only": false,
-    "replace_translation": true
+    "replace_translation": false
   }
 }
