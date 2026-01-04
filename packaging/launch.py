@@ -1266,7 +1266,7 @@ def check_all_updates():
     print("=" * 40)
     print()
     
-    # 1. 检查代码版本
+    # 1. 检查代码版本和提交
     print("[1/2] 检查代码版本...")
     version_file = PATH_ROOT / "packaging" / "VERSION"
     try:
@@ -1299,12 +1299,44 @@ def check_all_updates():
     except Exception:
         remote_version = "unknown"
     
-    code_needs_update = (current_version != remote_version and remote_version != "unknown")
+    # 获取本地和远程的 commit hash
+    try:
+        local_commit = subprocess.run(
+            [git, 'rev-parse', 'HEAD'],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5
+        ).stdout.strip()
+    except Exception:
+        local_commit = "unknown"
+    
+    try:
+        remote_commit = subprocess.run(
+            [git, 'rev-parse', 'origin/main'],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5
+        ).stdout.strip()
+    except Exception:
+        remote_commit = "unknown"
+    
+    # 判断是否需要更新：版本号不同 或 提交不同
+    version_differs = (current_version != remote_version and remote_version != "unknown")
+    commit_differs = (local_commit != remote_commit and remote_commit != "unknown" and local_commit != "unknown")
+    code_needs_update = version_differs or commit_differs
     
     print(f"  当前版本: {current_version}")
     print(f"  远程版本: {remote_version}")
+    print(f"  本地提交: {local_commit[:8] if local_commit != 'unknown' else 'unknown'}")
+    print(f"  远程提交: {remote_commit[:8] if remote_commit != 'unknown' else 'unknown'}")
+    
     if code_needs_update:
-        print("  状态: [需要更新]")
+        if version_differs:
+            print("  状态: [需要更新 - 版本不同]")
+        else:
+            print("  状态: [需要更新 - 有新提交]")
     else:
         print("  状态: [已是最新]")
     
