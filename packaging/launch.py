@@ -1633,16 +1633,61 @@ def maintenance_menu():
                     from build_utils.package_checker import load_req_file
                     all_packages = load_req_file(req_file)
                     
-                    # 提取包名
+                    # 提取包名 - 使用 Requirement 对象解析
                     package_names = []
-                    for pkg in all_packages:
-                        pkg_name = pkg.split('==')[0].split('>=')[0].split('<=')[0].split('[')[0].strip()
-                        package_names.append(pkg_name)
+                    for pkg_str in all_packages:
+                        try:
+                            # 使用 packaging.requirements.Requirement 解析
+                            from packaging.requirements import Requirement
+                            req = Requirement(pkg_str)
+                            # 使用 name 属性获取规范化的包名
+                            pkg_name = req.name
+                            if pkg_name:
+                                package_names.append(pkg_name)
+                        except Exception:
+                            # 解析失败，使用简单的字符串分割
+                            if '@' in pkg_str:
+                                pkg_name = pkg_str.split('@')[0].strip()
+                            else:
+                                pkg_name = pkg_str.split('==')[0].split('>=')[0].split('<=')[0].split('<')[0].split('>')[0].strip()
+                            
+                            if '[' in pkg_name:
+                                pkg_name = pkg_name.split('[')[0].strip()
+                            
+                            pkg_name = pkg_name.rstrip(',').strip()
+                            
+                            if pkg_name:
+                                package_names.append(pkg_name)
                     
                     if package_names:
                         print(f"卸载 {len(package_names)} 个包...")
-                        packages_str = ' '.join(package_names)
-                        run(f'"{python}" -m pip uninstall {packages_str} -y', "卸载依赖包", "卸载失败", live=True)
+                        
+                        # 分批卸载，每次最多20个包，避免命令行过长
+                        batch_size = 20
+                        failed_packages = []
+                        
+                        for i in range(0, len(package_names), batch_size):
+                            batch = package_names[i:i+batch_size]
+                            batch_str = ' '.join(batch)
+                            
+                            try:
+                                print(f"  卸载批次 {i//batch_size + 1}/{(len(package_names) + batch_size - 1)//batch_size}...")
+                                run(f'"{python}" -m pip uninstall {batch_str} -y', f"卸载 {len(batch)} 个包", "卸载失败", live=False)
+                            except Exception as batch_err:
+                                print(f"  批次卸载失败，尝试逐个卸载...")
+                                # 批次失败，逐个卸载
+                                for pkg in batch:
+                                    try:
+                                        run(f'"{python}" -m pip uninstall {pkg} -y', f"卸载 {pkg}", "卸载失败", live=False)
+                                    except Exception:
+                                        failed_packages.append(pkg)
+                        
+                        if failed_packages:
+                            print(f"  [警告] {len(failed_packages)} 个包卸载失败: {', '.join(failed_packages[:5])}")
+                            if len(failed_packages) > 5:
+                                print(f"         ... 还有 {len(failed_packages) - 5} 个")
+                        else:
+                            print("  ✓ 所有包卸载完成")
                         
                         # 清理 pip 缓存
                         print('正在清理 pip 缓存...')
