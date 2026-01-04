@@ -3059,9 +3059,10 @@ class MangaTranslator:
                         preprocessed_contexts.append((ctx, config))
 
                 # --- 阶段2: 翻译 ---
-                if self.colorize_only:
-                    # 特殊情况：仅上色模式，跳过翻译
-                    logger.info("Colorize Only mode: Skipping translation and rendering stages.")
+                if self.colorize_only or self.upscale_only or self.inpaint_only:
+                    # 特殊情况：仅上色/仅超分/仅修复模式，跳过翻译
+                    mode_name = "Colorize Only" if self.colorize_only else ("Upscale Only" if self.upscale_only else "Inpaint Only")
+                    logger.info(f"{mode_name} mode: Skipping translation and rendering stages.")
                     translated_contexts = preprocessed_contexts
                 elif is_template_save_mode:
                     # 特殊情况：导出原文模式，跳过翻译
@@ -3166,8 +3167,8 @@ class MangaTranslator:
                             if not self._restore_image_context(image_md5):
                                 self._set_image_context(config, ctx.input)
                         
-                        # Colorize Only Mode: Skip rendering pipeline
-                        if not self.colorize_only:
+                        # Colorize/Upscale/Inpaint Only Mode: Skip rendering pipeline
+                        if not self.colorize_only and not self.upscale_only and not self.inpaint_only:
                             ctx = await self._complete_translation_pipeline(ctx, config)
                         if save_info and ctx.result:
                             try:
@@ -3201,8 +3202,15 @@ class MangaTranslator:
                             self._save_text_to_file(ctx.image_name, ctx, config)
 
                         results.append(ctx)
-                        
+
                         # ✅ 渲染完一张立即清理这张图片的中间数据（不等整个批次完成）
+                        if hasattr(ctx, 'input') and ctx.input is not None:
+                            if hasattr(ctx.input, 'close'):
+                                try:
+                                    ctx.input.close()
+                                except:
+                                    pass
+                            ctx.input = None
                         if hasattr(ctx, 'img_rgb') and ctx.img_rgb is not None:
                             del ctx.img_rgb
                             ctx.img_rgb = None
@@ -3317,10 +3325,7 @@ class MangaTranslator:
             ctx.result = ctx.img_colorized
             ctx.text_regions = []  # Empty text regions
             await self._report_progress('colorize-only-complete', True)
-            
-            # ✅ 使用统一的清理方法
-            self._cleanup_context_memory(ctx, keep_result=True)
-            
+            # 不在这里清理，让调用方在保存JSON后统一清理
             return ctx
 
         # -- Upscaling
@@ -3342,10 +3347,7 @@ class MangaTranslator:
             ctx.result = ctx.upscaled
             ctx.text_regions = []  # Empty text regions
             await self._report_progress('upscale-only-complete', True)
-            
-            # ✅ 使用统一的清理方法
-            self._cleanup_context_memory(ctx, keep_result=True)
-            
+            # 不在这里清理，让调用方在保存JSON后统一清理
             return ctx
 
         # --- Inpaint Only Mode Check (for batch processing) ---
@@ -3386,10 +3388,7 @@ class MangaTranslator:
                 ctx.result = ctx.img_inpainted
                 ctx.text_regions = []
                 await self._report_progress('inpaint-only-complete', True)
-                
-                # ✅ 使用统一的清理方法
-                self._cleanup_context_memory(ctx, keep_result=True)
-                
+                # 不在这里清理，让调用方在保存JSON后统一清理
                 return ctx
             
             # Step 2: 填充文本 - 跳过OCR，为每个textline填充占位文本
@@ -3430,10 +3429,7 @@ class MangaTranslator:
                 ctx.img_inpainted = ctx.img_rgb
                 ctx.result = ctx.img_inpainted
                 await self._report_progress('inpaint-only-complete', True)
-                
-                # ✅ 使用统一的清理方法
-                self._cleanup_context_memory(ctx, keep_result=True)
-                
+                # 不在这里清理，让调用方在保存JSON后统一清理
                 return ctx
             
             # Step 4: Mask Refinement - 使用text_regions和mask_raw优化蒙版
@@ -3474,16 +3470,13 @@ class MangaTranslator:
                 ctx.result = ctx.img_inpainted
             
             ctx.text_regions = []
-            
+
             # 设置标志，告诉_complete_translation_pipeline跳过处理
             ctx.inpaint_only_complete = True
-            
+
             logger.info("=== Inpaint Only Mode Complete ===")
             await self._report_progress('inpaint-only-complete', True)
-            
-            # ✅ 使用统一的清理方法
-            self._cleanup_context_memory(ctx, keep_result=True)
-            
+            # 不在这里清理，让调用方在保存JSON后统一清理
             return ctx
 
         ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
@@ -4995,8 +4988,8 @@ class MangaTranslator:
                         if not self._restore_image_context(image_md5):
                             self._set_image_context(config, ctx.input)
                     
-                    # Colorize Only Mode: Skip rendering pipeline
-                    if not self.colorize_only:
+                    # Colorize/Upscale/Inpaint Only Mode: Skip rendering pipeline
+                    if not self.colorize_only and not self.upscale_only and not self.inpaint_only:
                         ctx = await self._complete_translation_pipeline(ctx, config)
                     
                     # --- BEGIN SAVE LOGIC ---
@@ -5039,6 +5032,13 @@ class MangaTranslator:
                         ctx.result = None  # 保存后删除渲染结果
                     
                     # ✅ 清理中间处理图像（保留text_regions等元数据）
+                    if hasattr(ctx, 'input') and ctx.input is not None:
+                        if hasattr(ctx.input, 'close'):
+                            try:
+                                ctx.input.close()
+                            except:
+                                pass
+                        ctx.input = None
                     if hasattr(ctx, 'img_rgb'):
                         ctx.img_rgb = None
                     if hasattr(ctx, 'img_inpainted'):

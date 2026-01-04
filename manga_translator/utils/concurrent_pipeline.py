@@ -623,6 +623,14 @@ class ConcurrentPipeline:
                 
                 # 渲染完成后立即清理内存（注意：_run_text_rendering 已经清理了 ctx.img_rgb）
                 logger.debug(f"[渲染] 清理内存: {ctx.image_name}")
+                # 清理 ctx.input
+                if hasattr(ctx, 'input') and ctx.input is not None:
+                    if hasattr(ctx.input, 'close'):
+                        try:
+                            ctx.input.close()
+                        except:
+                            pass
+                    ctx.input = None
                 # ctx.img_rgb 已在 _run_text_rendering 中清理
                 if hasattr(ctx, 'img_rgb') and ctx.img_rgb is not None:
                     del ctx.img_rgb

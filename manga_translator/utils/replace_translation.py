@@ -196,7 +196,10 @@ async def translate_batch_replace_translation(translator, images_with_configs: L
             logger.info("  [1/4] 生肉图检测+OCR...")
             raw_ctx = await translator._translate_until_translation(image, config)
             raw_ctx.image_name = image_name
-            
+            # 保存原始图片尺寸（用于保存JSON）
+            if hasattr(image, 'size'):
+                raw_ctx.original_size = image.size
+
             if not raw_ctx.text_regions:
                 logger.warning("  [跳过] 生肉图未检测到文本区域")
                 raw_ctx.success = False
