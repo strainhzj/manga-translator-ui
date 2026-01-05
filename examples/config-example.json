@@ -49,7 +49,7 @@
     "min_box_area_ratio": 0
   },
   "inpainter": {
-    "inpainter": "none",
+    "inpainter": "lama_large",
     "inpainting_size": 2048,
     "inpainting_precision": "fp32",
     "inpainting_split_ratio": 3.0,
@@ -71,7 +71,7 @@
     "line_spacing": null,
     "font_size": null,
     "auto_rotate_symbols": false,
-    "rtl": false,
+    "rtl": true,
     "layout_mode": "smart_scaling",
     "max_font_size": 0,
     "font_scale_ratio": 1.0,
@@ -80,7 +80,7 @@
     "check_br_and_retry": false,
     "strict_smart_scaling": false,
     "stroke_width": 0.07,
-    "enable_template_alignment": true,
+    "enable_template_alignment": false,
     "paste_connect_distance_ratio": 0.03,
     "paste_mask_dilation_pixels": 10
   },
@@ -103,7 +103,7 @@
     "use_gpu": true,
     "context_size": 3,
     "format": "不指定",
-    "overwrite": true,
+    "overwrite": false,
     "skip_no_text": false,
     "save_text": true,
     "load_text": false,
@@ -119,6 +119,6 @@
     "export_editable_psd": false,
     "psd_font": null,
     "psd_script_only": false,
-    "replace_translation": true
+    "replace_translation": false
   }
 }
