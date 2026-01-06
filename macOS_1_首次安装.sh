@@ -98,7 +98,10 @@ setup_miniconda() {
     
     # 下载
     echo -e "${BLUE}[*] 下载 Miniforge...${NC}"
-    curl -L -o "$INSTALLER_PATH" "$MINICONDA_URL"
+    curl -fL -o "$INSTALLER_PATH" "$MINICONDA_URL" || {
+        echo -e "${RED}[错误] 下载 Miniforge 失败${NC}"
+        exit 1
+    }
     
     # 安装
     echo -e "${BLUE}[*] 安装 Miniforge 到 $MINICONDA_DIR...${NC}"
