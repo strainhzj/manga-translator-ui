@@ -197,15 +197,46 @@ docker run -d --name manga-translator -p 8000:8000 hgmzhn/manga-translator:lates
 
 专为 M1/M2/M3/M4 Mac 优化的原生运行方式，支持 MPS (Metal Performance Shaders) GPU 加速。
 
-1. **下载安装脚本**：
-   - 确保将项目下载/克隆到本地
-2. **运行安装**：
-   - 在终端运行 `./macOS_1_首次安装.sh`
-   - 脚本会自动安装 Miniforge、配置环境并安装 MPS 加速支持
-3. **启动程序**：
-   - 运行 `./macOS_2_启动Qt界面.sh`
+**快速开始（推荐）**：
 
-> ⚠️ **注意**：仅支持 Apple Silicon (M1/M2/M3/M4) 芯片，Intel Mac 请使用 CPU 模式或 Docker。
+1. **下载安装脚本**：
+   ```bash
+   curl -O https://raw.githubusercontent.com/hgmzhn/manga-translator-ui/main/macOS_1_首次安装.sh
+   chmod +x macOS_1_首次安装.sh
+   ```
+
+2. **运行安装**：
+   ```bash
+   ./macOS_1_首次安装.sh
+   ```
+   脚本会自动完成：
+   - 检查并安装必要组件（Xcode 命令行工具、Git）
+   - 克隆项目代码
+   - 安装 Miniforge 和 Python 环境
+   - 配置 MPS GPU 加速支持
+
+3. **启动程序**：
+   ```bash
+   ./macOS_2_启动Qt界面.sh
+   ```
+
+4. **后续更新**：
+   ```bash
+   ./macOS_4_更新维护.sh
+   ```
+
+**或者手动克隆**：
+```bash
+git clone https://github.com/hgmzhn/manga-translator-ui.git
+cd manga-translator-ui
+chmod +x macOS_*.sh
+./macOS_1_首次安装.sh
+```
+
+> ⚠️ **注意**：
+> - 优先支持 Apple Silicon (M1/M2/M3/M4) 芯片
+> - Intel Mac 也可运行，但会使用 CPU 模式
+> - 首次安装需要下载约 2GB 的依赖包，请确保网络畅通
 
 
 ---
