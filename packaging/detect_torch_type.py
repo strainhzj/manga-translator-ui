@@ -21,6 +21,10 @@ def detect_torch_type():
             cuda_version = torch.version.cuda
             return "GPU", f"cu{cuda_version.replace('.', '')}" if cuda_version else "unknown"
         
+        # 检查是否支持 MPS (Apple Silicon Metal)
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return "Metal", "mps"
+        
         else:
             # CPU 版本
             torch_version = torch.__version__
@@ -41,6 +45,8 @@ def get_requirements_file():
         return "requirements_gpu.txt"
     elif torch_type == "AMD":
         return "requirements_amd.txt"
+    elif torch_type == "Metal":
+        return "requirements_metal.txt"
     elif torch_type == "CPU":
         return "requirements_cpu.txt"
     else:

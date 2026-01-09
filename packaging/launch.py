@@ -579,9 +579,47 @@ def detect_gpu():
                 pass
                 
         else:
-            # Linux/Mac: 使用lspci或其他工具
+            # macOS: 特殊处理 Apple Silicon
+            if sys.platform == 'darwin':
+                try:
+                    # 检测是否是 Apple Silicon (M1/M2/M3/M4 等)
+                    import platform
+                    machine = platform.machine()
+                    
+                    if machine == 'arm64':
+                        # Apple Silicon Mac，使用 system_profiler 获取芯片信息
+                        try:
+                            output = subprocess.check_output(
+                                "system_profiler SPHardwareDataType | grep 'Chip'",
+                                shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5
+                            )
+                            # 解析芯片名称，例如 "Chip: Apple M4 Pro"
+                            chip_name = ""
+                            for line in output.strip().split('\n'):
+                                if 'Chip' in line:
+                                    parts = line.split(':')
+                                    if len(parts) >= 2:
+                                        chip_name = parts[1].strip()
+                                        break
+                            
+                            if chip_name and ('M1' in chip_name or 'M2' in chip_name or 
+                                              'M3' in chip_name or 'M4' in chip_name or
+                                              'Apple' in chip_name):
+                                # Apple Silicon，支持 Metal
+                                return "AppleSilicon", chip_name, None, None, None
+                        except Exception:
+                            pass
+                        
+                        # 如果无法获取具体芯片名称，但确定是 arm64，仍然返回 Apple Silicon
+                        return "AppleSilicon", "Apple Silicon", None, None, None
+                    
+                    # Intel Mac，继续使用下面的通用检测逻辑
+                except Exception:
+                    pass
+            
+            # Linux 或 Intel Mac: 使用lspci或其他工具
             try:
-                output = subprocess.check_output("lspci | grep -i vga", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
+                output = subprocess.check_output("lspci | grep -i vga", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='utf-8', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -592,9 +630,9 @@ def detect_gpu():
             except:
                 pass
             
-            # 尝试使用 lshw
+            # 尝试使用 lshw (Linux only)
             try:
-                output = subprocess.check_output("lshw -C display 2>/dev/null | grep 'product:'", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='gbk', errors='ignore')
+                output = subprocess.check_output("lshw -C display 2>/dev/null | grep 'product:'", shell=True, text=True, stderr=subprocess.DEVNULL, timeout=5, encoding='utf-8', errors='ignore')
                 gpu_type, gpu_name = check_gpu_keywords(output)
                 if gpu_type:
                     # 如果是 NVIDIA，检查 CUDA 版本
@@ -685,7 +723,7 @@ def detect_amd_gfx_version(gpu_name):
 
 
 def detect_installed_pytorch_version():
-    """检测当前安装的PyTorch版本类型(CPU/GPU)"""
+    """检测当前安装的PyTorch版本类型(CPU/GPU/Metal)"""
     try:
         # 在子进程中检测，避免在主进程中加载 torch DLL
         # 这样可以在需要时卸载 torch
@@ -693,12 +731,19 @@ def detect_installed_pytorch_version():
 import sys
 try:
     import torch
-    if torch.cuda.is_available():
+    # 检查 AMD ROCm
+    if hasattr(torch.version, 'hip') and torch.version.hip:
+        print(f"AMD|ROCm {torch.version.hip}")
+    # 检查 NVIDIA CUDA
+    elif torch.cuda.is_available():
         cuda_version = torch.version.cuda
         if cuda_version:
             print(f"GPU|CUDA {cuda_version}")
         else:
             print("GPU|Unknown CUDA")
+    # 检查 Apple Silicon Metal (MPS)
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        print("Metal|MPS")
     else:
         print("CPU|CPU-only")
 except (ImportError, AttributeError):
@@ -732,6 +777,10 @@ def get_requirements_file_from_env():
     
     if pytorch_type == "GPU":
         return 'requirements_gpu.txt', pytorch_type, detail
+    elif pytorch_type == "Metal":
+        return 'requirements_metal.txt', pytorch_type, detail
+    elif pytorch_type == "AMD":
+        return 'requirements_amd.txt', pytorch_type, detail
     elif pytorch_type == "CPU":
         return 'requirements_cpu.txt', pytorch_type, detail
     else:
@@ -1035,6 +1084,21 @@ except:
                     break
                 else:
                     print('无效输入,请输入 1 或 2')
+                    
+        elif gpu_type == "AppleSilicon":
+            # Apple Silicon Mac，使用 Metal 加速
+            print('=' * 50)
+            print('检测到 Apple Silicon')
+            print('=' * 50)
+            print('')
+            if gpu_name:
+                print(f'芯片型号: {gpu_name}')
+            print('')
+            print('✓ Apple Silicon 支持 Metal 加速')
+            print('✓ 将使用 Metal 版本以获得最佳性能')
+            print('')
+            requirements_file = 'requirements_metal.txt'
+            print(f'✓ 使用: {requirements_file} (Apple Metal)')
                     
         elif gpu_type == "CPU":
             # 自动检测失败,让用户手动选择
