@@ -670,64 +670,74 @@ def detect_gpu():
 def detect_amd_gfx_version(gpu_name):
     """根据 AMD 显卡名称检测对应的 gfx 版本
     
-    返回: (gfx_version, architecture_name) 或 (None, None)
+    返回: (gfx_version, architecture_name, has_torch_support) 或 (None, None, False)
     """
     if not gpu_name:
-        return None, None
+        return None, None, False
     
     gpu_name_upper = gpu_name.upper()
     
     # AMD 显卡型号到 gfx 版本的映射
     # 参考: https://github.com/ROCm/ROCm
+    # 注意：只有部分 gfx 版本在 AMD ROCm PyTorch 源中有 torch 包
     amd_gpu_mapping = {
-        # RDNA 3 架构 (RX 7000 系列)
-        'gfx1150': {
-            'keywords': ['7900 XTX', '7900 XT', '7950'],
-            'name': 'RDNA 3 (Navi 31)'
+        # RDNA 3 架构 (RX 7000 系列) - 部分支持
+        'gfx110X-all': {
+            'keywords': ['RX 7'],  # 通用 RX 7000 系列
+            'name': 'RDNA 3 (RX 7000 系列)',
+            'has_torch': True
+        },
+        'gfx110X-dgpu': {
+            'keywords': ['7900 XTX', '7900 XT', '7950'],  # 高端型号
+            'name': 'RDNA 3 (Navi 31)',
+            'has_torch': True
         },
         'gfx1151': {
             'keywords': ['7800 XT', '7700 XT', '7600'],
-            'name': 'RDNA 3 (Navi 32/33)'
+            'name': 'RDNA 3 (Navi 32/33)',
+            'has_torch': True
         },
-        'gfx110X-all': {
-            'keywords': ['RX 7'],  # 通用 RX 7000 系列
-            'name': 'RDNA 3 (RX 7000 系列)'
-        },
+        # gfx1150 没有 torch 支持
         
-        # RDNA 2 架构 (RX 6000 系列) - 不支持，使用CPU
-        # 'gfx103X-dgpu': {
-        #     'keywords': ['RX 6', '6900', '6800', '6700', '6600', '6500', '6400'],
-        #     'name': 'RDNA 2 (RX 6000 系列) - 不支持，请使用CPU版本'
-        # },
-        
-        # RDNA 1 架构 (RX 5000 系列) - 不支持，使用CPU
-        # 'gfx101X-dgpu': {
-        #     'keywords': ['RX 5', '5700', '5600', '5500'],
-        #     'name': 'RDNA 1 (RX 5000 系列) - 不支持，请使用CPU版本'
-        # },
-        
-        # Vega 架构
-        'gfx90X-dcgpu': {
-            'keywords': ['VEGA', 'RADEON VII', 'MI25', 'MI50', 'MI60'],
-            'name': 'Vega (Radeon VII / MI50/60)'
-        },
-        
-        # CDNA 2 (数据中心)
-        'gfx94X-dcgpu': {
-            'keywords': ['MI200', 'MI210', 'MI250', 'MI260'],
-            'name': 'CDNA 2 (MI200 系列)'
-        },
-        
-        # CDNA 3 (数据中心)
-        'gfx950-dcgpu': {
-            'keywords': ['MI300'],
-            'name': 'CDNA 3 (MI300 系列)'
-        },
-        
-        # RDNA 4 架构 (RX 9000 系列)
+        # RDNA 4 架构 (RX 9000 系列) - 支持
         'gfx120X-all': {
             'keywords': ['RX 9', '9070 XT', '9070', '9060 XT', '9060', '9050'],
-            'name': 'RDNA 4 (RX 9000 系列)'
+            'name': 'RDNA 4 (RX 9000 系列)',
+            'has_torch': True
+        },
+        
+        # CDNA 数据中心系列 - 支持
+        'gfx94X-dcgpu': {
+            'keywords': ['MI200', 'MI210', 'MI250', 'MI260'],
+            'name': 'CDNA 2 (MI200 系列)',
+            'has_torch': True
+        },
+        'gfx950-dcgpu': {
+            'keywords': ['MI300'],
+            'name': 'CDNA 3 (MI300 系列)',
+            'has_torch': True
+        },
+        
+        # 以下架构不支持 torch（已验证）
+        # RDNA 2 架构 (RX 6000 系列) - 不支持
+        'gfx103X-dgpu': {
+            'keywords': ['RX 6', '6900', '6800', '6700', '6600', '6500', '6400'],
+            'name': 'RDNA 2 (RX 6000 系列) - 不支持 PyTorch',
+            'has_torch': False
+        },
+        
+        # RDNA 1 架构 (RX 5000 系列) - 不支持
+        'gfx101X-dgpu': {
+            'keywords': ['RX 5', '5700', '5600', '5500'],
+            'name': 'RDNA 1 (RX 5000 系列) - 不支持 PyTorch',
+            'has_torch': False
+        },
+        
+        # Vega 架构 - 不支持
+        'gfx90X-dcgpu': {
+            'keywords': ['VEGA', 'RADEON VII', 'MI25', 'MI50', 'MI60'],
+            'name': 'Vega (Radeon VII / MI50/60) - 不支持 PyTorch',
+            'has_torch': False
         },
     }
     
@@ -735,9 +745,9 @@ def detect_amd_gfx_version(gpu_name):
     for gfx_version, info in amd_gpu_mapping.items():
         for keyword in info['keywords']:
             if keyword in gpu_name_upper:
-                return gfx_version, info['name']
+                return gfx_version, info['name'], info.get('has_torch', False)
     
-    return None, None
+    return None, None, False
 
 
 def detect_installed_pytorch_version():
@@ -916,11 +926,18 @@ except:
                         update_choice = input('是否更新 AMD ROCm PyTorch? (y/n, 默认n): ').strip().lower()
                         if update_choice in ['y', 'yes']:
                             # 自动检测 gfx 版本
-                            detected_gfx, arch_name = detect_amd_gfx_version(gpu_name) if gpu_name else (None, None)
+                            detected_gfx, arch_name, has_torch = detect_amd_gfx_version(gpu_name) if gpu_name else (None, None, False)
                             
                             if detected_gfx:
                                 print(f'\n自动识别架构: {arch_name}')
                                 print(f'对应 gfx 版本: {detected_gfx}')
+                                
+                                if not has_torch:
+                                    print(f'⚠️  警告: {detected_gfx} 不支持 AMD ROCm PyTorch')
+                                    print('建议使用 CPU 版本')
+                                    use_amd_pytorch = False
+                                    continue
+                                
                                 use_detected = input(f'使用检测到的 {detected_gfx}? (y/n, 默认y): ').strip().lower()
                                 if use_detected in ['', 'y', 'yes']:
                                     amd_gfx_version = detected_gfx
@@ -928,7 +945,7 @@ except:
                                     amd_gfx_version = input('请输入您的 gfx 版本: ').strip()
                             else:
                                 print('\n无法自动检测 gfx 版本')
-                                amd_gfx_version = input('请输入您的 gfx 版本 (如 gfx103X-dgpu): ').strip()
+                                amd_gfx_version = input('请输入您的 gfx 版本 (如 gfx110X-all): ').strip()
                             
                             if not amd_gfx_version:
                                 print('[INFO] 未输入 gfx 版本，跳过 AMD PyTorch 更新')
@@ -1031,7 +1048,7 @@ except:
                     
         elif gpu_type == "AMD":
             # 检测 AMD GPU 的 gfx 版本
-            detected_gfx, arch_name = detect_amd_gfx_version(gpu_name)
+            detected_gfx, arch_name, has_torch = detect_amd_gfx_version(gpu_name)
             
             print('=' * 50)
             print('检测到 AMD GPU')
@@ -1041,6 +1058,9 @@ except:
             if detected_gfx:
                 print(f'自动识别架构: {arch_name}')
                 print(f'对应 gfx 版本: {detected_gfx}')
+                if not has_torch:
+                    print(f'⚠️  该显卡不支持 AMD ROCm PyTorch')
+                    print(f'⚠️  建议使用 CPU 版本')
             else:
                 print('⚠️  无法自动识别 AMD GPU 架构')
             
@@ -1050,10 +1070,10 @@ except:
             print('  [2] CPU 版本 (推荐,兼容性好)')
             print('')
             
-            if detected_gfx:
+            if detected_gfx and has_torch:
                 print(f'建议: 选择 [1] 并使用检测到的 {detected_gfx}')
             else:
-                print('建议: 选择 [2] CPU 版本,或查询您的显卡对应的 gfx 版本')
+                print('建议: 选择 [2] CPU 版本')
             print('')
             
             while True:
@@ -1061,19 +1081,21 @@ except:
                 if choice == '1':
                     # 用户选择 AMD GPU
                     print('')
-                    print('支持的 AMD gfx 版本:')
+                    print('✓ 支持 PyTorch 的 AMD gfx 版本:')
+                    print('  - gfx110X-all:  RX 7000 系列 (RDNA 3)')
+                    print('  - gfx110X-dgpu: RX 7900 XTX/XT (Navi 31)')
+                    print('  - gfx1151:      RX 7800/7700/7600 (Navi 32/33)')
+                    print('  - gfx120X-all:  RX 9000 系列 (RDNA 4)')
+                    print('  - gfx94X-dcgpu: MI200 系列 (CDNA 2)')
+                    print('  - gfx950-dcgpu: MI300 系列 (CDNA 3)')
+                    print('')
+                    print('✗ 不支持 PyTorch 的版本:')
                     print('  - gfx101X-dgpu: RX 5000 系列 (RDNA 1)')
                     print('  - gfx103X-dgpu: RX 6000 系列 (RDNA 2)')
-                    print('  - gfx110X-all:  RX 7000 系列 (RDNA 3)')
-                    print('  - gfx1150:      RX 7900 XTX/XT (Navi 31)')
-                    print('  - gfx1151:      RX 7800/7700/7600 (Navi 32/33)')
-                    print('  - gfx120X-all:  RX 9070 XT/9070/9060 XT (RDNA 4)')
                     print('  - gfx90X-dcgpu: Vega / Radeon VII')
-                    print('  - gfx94X-dcgpu: MI200 系列')
-                    print('  - gfx950-dcgpu: MI300 系列')
                     print('')
                     
-                    if detected_gfx:
+                    if detected_gfx and has_torch:
                         default_gfx = detected_gfx
                         gfx_input = input(f'请输入您的 gfx 版本 (默认 {detected_gfx}): ').strip()
                         if not gfx_input:
@@ -1139,11 +1161,18 @@ except:
                 elif choice == '2':
                     # AMD GPU 手动输入
                     print('')
-                    print('支持的 AMD gfx 版本:')
+                    print('✓ 支持 PyTorch 的 AMD gfx 版本:')
+                    print('  - gfx110X-all:  RX 7000 系列 (RDNA 3)')
+                    print('  - gfx110X-dgpu: RX 7900 XTX/XT (Navi 31)')
+                    print('  - gfx1151:      RX 7800/7700/7600 (Navi 32/33)')
+                    print('  - gfx120X-all:  RX 9000 系列 (RDNA 4)')
+                    print('  - gfx94X-dcgpu: MI200 系列')
+                    print('  - gfx950-dcgpu: MI300 系列')
+                    print('')
+                    print('✗ 不支持 PyTorch 的版本:')
+                    print('  - gfx101X-dgpu: RX 5000 系列')
                     print('  - gfx103X-dgpu: RX 6000 系列')
-                    print('  - gfx110X-all:  RX 7000 系列')
-                    print('  - gfx1150:      RX 7900 XTX/XT')
-                    print('  (更多版本见上方 AMD 选项说明)')
+                    print('  - gfx90X-dcgpu: Vega / Radeon VII')
                     print('')
                     gfx_input = input('请输入您的 gfx 版本: ').strip()
                     if gfx_input:
@@ -1252,21 +1281,11 @@ except:
         # AMD ROCm PyTorch 的 index URL
         amd_index_url = f"https://d2awnip2yjpvqn.cloudfront.net/v2/{amd_gfx_version}/"
 
-        # 根据是否为更新模式决定版本要求
-        # 如果是首次安装（install-deps-only），锁定具体版本
-        # 如果是更新依赖（update-deps），安装最新版本
-        if args and hasattr(args, 'update_deps') and args.update_deps:
-            # 步骤4：更新到最新版本
-            torch_version = "torch>=2.9.0"
-            torchvision_version = "torchvision>=0.24.0"
-            torchaudio_version = "torchaudio>=2.9.0"
-            print('模式: 更新到最新版本')
-        else:
-            # 步骤1：首次安装，锁定完整版本（包含ROCm版本号）
-            torch_version = "torch==2.9.0+rocm7.10.0a20251031"
-            torchvision_version = "torchvision==0.24.0+rocm7.10.0a20251031"
-            torchaudio_version = "torchaudio==2.9.0+rocm7.10.0a20251031"
-            print('模式: 首次安装，锁定版本 2.9.0+rocm7.10.0a20251031')
+        # 锁定版本到 ROCm 7.10.0（稳定版本）
+        torch_version = "torch==2.9.0+rocm7.10.0a20251031"
+        torchvision_version = "torchvision==0.24.0+rocm7.10.0a20251031"
+        torchaudio_version = "torchaudio==2.9.0+rocm7.10.0a20251031"
+        print('模式: 锁定版本 2.9.0+rocm7.10.0a20251031')
 
         # 安装 AMD ROCm PyTorch
         print(f'正在从 AMD ROCm 源安装 PyTorch...')
