@@ -264,9 +264,14 @@ class ModelPaddleOCR(OfflineOCR):
                 else:
                     region_bgr = region
 
-                # 使用基类的通用气泡过滤方法（支持高级检测）
+                # 使用基类的通用气泡过滤方法 - 缩放到 48px 后再过滤（与其他 OCR 模型一致）
                 if ignore_bubble > 0:
-                    if self._should_ignore_region(region, ignore_bubble, image, q):
+                    # 缩放到 48px 高度用于过滤（与 _preprocess 一致）
+                    h, w = region.shape[:2]
+                    ratio = w / float(h)
+                    resized_w = int(math.ceil(48 * ratio))
+                    region_48px = cv2.resize(region, (resized_w, 48))
+                    if self._should_ignore_region(region_48px, ignore_bubble, image, textline):
                         self.logger.info(f'[FILTERED] Region {i} ignored - Non-bubble area detected (ignore_bubble={ignore_bubble})')
                         continue
 
