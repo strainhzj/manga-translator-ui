@@ -97,13 +97,20 @@ def main():
         def _worker(self):
             while self.running:
                 try:
-                    record = self.log_queue.get(timeout=0.1)
+                    # ✅ 减少超时时间，更快处理日志
+                    record = self.log_queue.get(timeout=0.01)
                     if record is None:
                         break
                     msg = self.format(record)
                     self.stream.write(msg + '\n')
+                    # ✅ 每条日志立即刷新
                     self.stream.flush()
                 except queue.Empty:
+                    # ✅ 即使队列为空也刷新一次，确保之前的输出显示
+                    try:
+                        self.stream.flush()
+                    except:
+                        pass
                     continue
                 except Exception:
                     pass
