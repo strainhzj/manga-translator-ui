@@ -635,7 +635,9 @@ class MainAppLogic(QObject):
                     proxy = http_proxy
 
                 try:
-                    async with aiohttp.ClientSession() as session:
+                    # 创建超时配置：连接超时10秒，读取超时30秒
+                    timeout = aiohttp.ClientTimeout(connect=10, sock_read=30)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
                         async with session.post(url, json=request_data, headers={"Content-Type": "application/json"}, proxy=proxy) as response:
                             if response.status == 200:
                                 # 读取响应（流式）
@@ -653,7 +655,9 @@ class MainAppLogic(QObject):
                             else:
                                 error_text = await response.text()
                                 return False, f"连接失败 (HTTP {response.status}): {error_text[:200]}"
-                except aiohttp.ClientConnectorError:
+                except asyncio.TimeoutError:
+                    return False, "连接超时，请检查网络连接或代理设置"
+                except aiohttp.ClientError:
                     return False, "网络连接失败，请检查网络连接或代理设置"
                 except Exception as e:
                     return False, f"连接失败: {str(e)}"

@@ -212,13 +212,14 @@ Google Vertex AI 是 Google Cloud 的企业级 AI 服务，提供 Gemini 等模�
 
 ### API Key 格式要求
 
-**✅ 正确的 Google Cloud API Key**：
+**✅ 正确的 Google Cloud API Key 格式**：
 ```
-AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe
+YOUR_GOOGLE_CLOUD_API_KEY
 ```
 - 以 `AIza` 开头
 - 约 39-40 字符长度
 - 只包含字母和数字
+- **示例格式**：`AIza... (placeholder)`
 
 **❌ 错误的格式**：
 ```

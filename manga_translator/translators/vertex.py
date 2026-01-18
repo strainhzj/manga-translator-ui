@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import re
 from typing import List, Dict, Any
 import aiohttp
 
@@ -322,15 +323,21 @@ class VertexTranslator(CommonTranslator):
 
                 # 始终打印请求详情（用于调试）
                 self.logger.info(f"=== Vertex AI 请求详情 ===")
-                self.logger.info(f"URL: {url}")
+                # 脱敏 URL：隐藏 key 参数值
+                safe_url = url
+                if 'key=' in safe_url:
+                    safe_url = re.sub(r'key=[^&\s]+', 'key=***REDACTED***', safe_url)
+                self.logger.info(f"URL: {safe_url}")
                 self.logger.info(f"Method: POST")
-                self.logger.info(f"Headers: {headers}")
+                self.logger.info(f"Headers: {json.dumps({k: '***REDACTED***' if k.lower() in ['authorization', 'x-api-key'] else v for k, v in headers.items()})}")
                 try:
                     body_str = json.dumps(request_data, ensure_ascii=False, indent=2)
-                    self.logger.info(f"Body:\n{body_str}")
+                    # 详细请求体仅在 DEBUG 级别显示，并截断
+                    truncated_body = body_str[:200] + '...' if len(body_str) > 200 else body_str
+                    self.logger.debug(f"Body (truncated):\n{truncated_body}")
                 except Exception as e:
                     self.logger.error(f"Body 序列化失败: {e}")
-                    self.logger.info(f"Body (raw): {request_data}")
+                    self.logger.debug(f"Body (raw, truncated): {str(request_data)[:200]}")
                 self.logger.info(f"========================")
 
                 # 创建会话，如果配置了代理则使用代理
@@ -340,6 +347,8 @@ class VertexTranslator(CommonTranslator):
                                           auto_decompress=False) as response:
                         if response.status != 200:
                             error_text = await response.text()
+                            # 截断错误信息以避免泄露敏感内容
+                            truncated_error = error_text[:200] + '...' if len(error_text) > 200 else error_text
 
                             # 针对 401 错误提供详细的诊断信息
                             if response.status == 401:
@@ -358,14 +367,14 @@ class VertexTranslator(CommonTranslator):
                                 self.logger.error("详细配置指南：doc/VERTEX_AI_CONFIG.md")
                                 self.logger.error("================================")
 
-                            raise Exception(f"Vertex AI API error: {response.status} - {error_text}")
+                            raise Exception(f"Vertex AI API error: {response.status} - {truncated_error}")
 
                         # === 手动处理 gzip 压缩和 SSE 格式 ===
                         # 一次性读取所有数据（已禁用自动解压）
                         raw_data = await response.read()
                         self.logger.info(f"=== Vertex AI 响应处理 ===")
                         self.logger.info(f"原始数据长度: {len(raw_data)} 字节")
-                        self.logger.info(f"前 16 字节 (hex): {raw_data[:16].hex()}")
+                        self.logger.debug(f"前 16 字节 (hex): {raw_data[:16].hex()}")
 
                         # 检测并处理 gzip 压缩
                         if len(raw_data) >= 2 and raw_data[:2] == b'\x1f\x8b':
@@ -384,7 +393,9 @@ class VertexTranslator(CommonTranslator):
                         # 解码为文本
                         text_response = raw_data.decode('utf-8', errors='replace')
                         self.logger.info(f"解码后文本长度: {len(text_response)} 字符")
-                        self.logger.info(f"前 500 字符: {text_response[:500]}")
+                        # 详细响应内容仅在 DEBUG 级别显示，并截断到前 200 字符
+                        truncated_response = text_response[:200] + '...' if len(text_response) > 200 else text_response
+                        self.logger.debug(f"响应内容 (截断): {truncated_response}")
                         self.logger.info(f"==========================")
 
                         # Vertex AI 返回的是 JSON 数组格式，不是 SSE 格式

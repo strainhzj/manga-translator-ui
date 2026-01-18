@@ -18,18 +18,19 @@ ACCESS_TOKEN_TYPE_UNSUPPORTED
 
 **❌ 错误的格式**：
 ```
-AQ.Ab8RN6JRRqOgechiqF3TmWMCuUwc1BD2L2aO1ukgob_UobHQ2g
+<YOUR_OAUTH_ACCESS_TOKEN>
 ```
 - 这看起来像 OAuth access token，不是 API Key
 - Vertex AI 不支持这种认证方式
 
 **✅ 正确的 Google Cloud API Key 格式**：
 ```
-AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe
+YOUR_GOOGLE_CLOUD_API_KEY
 ```
 - 以 `AIza` 开头
 - 约 39-40 字符长度
 - 只包含字母和数字
+- **示例格式**：`AIza... (placeholder)`
 
 ---
 
@@ -61,8 +62,9 @@ AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe
 3. 选择 **API key**（API 密钥）
 4. 系统会自动生成一个 API Key，格式类似：
    ```
-   AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe
+   YOUR_GOOGLE_CLOUD_API_KEY
    ```
+   注意：请替换为您自己生成的实际 API Key
 
 #### 步骤 4：配置 API Key 限制（可选但推荐）
 
