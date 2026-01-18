@@ -11,6 +11,7 @@
 - [硅基流动 API 配置](#硅基流动-api-配置)
 - [DeepSeek API 配置](#deepseek-api-配置)
 - [Google Gemini API 配置](#google-gemini-api-配置)
+- [Google Vertex AI API 配置](#google-vertex-ai-api-配置)
 - [常见问题](#常见问题)
 
 ---
@@ -187,6 +188,55 @@ Google Gemini 是 Google 最新的多模态 AI 模型，性能强劲。
    - **模型**：
      - `gemini-2.5-pro`：断句稳定，质量最高 ⭐ 推荐
      - `gemini-2.5-flash`：速度快，价格便宜
+
+---
+
+## Google Vertex AI API 配置
+
+Google Vertex AI 是 Google Cloud 的企业级 AI 服务，提供 Gemini 等模型的 API 访问。
+
+> ⚠️ **重要**：Vertex AI 需要 Google Cloud Console 创建的 API Key，配置相对复杂。如果觉得复杂，建议使用 **Gemini 翻译器**（见上方）。
+
+### 快速配置指南
+
+**详细步骤**请参考：[Vertex AI 配置完整指南](VERTEX_AI_CONFIG.md)
+
+### 关键区别
+
+| 特性 | Gemini API | Vertex AI |
+|------|------------|-----------|
+| API 来源 | Google AI Studio | Google Cloud Console |
+| 配置难度 | 简单 | 较复杂 |
+| 功能 | 支持多模态 | 纯文本翻译 |
+| 推荐场景 | 个人用户 | 企业用户 |
+
+### API Key 格式要求
+
+**✅ 正确的 Google Cloud API Key**：
+```
+AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe
+```
+- 以 `AIza` 开头
+- 约 39-40 字符长度
+- 只包含字母和数字
+
+**❌ 错误的格式**：
+```
+AQ.Ab8RN6JRRqOgechiqF3TmWMCuUwc1BD2L2aO1ukgob_UobHQ2g
+```
+- 这是 OAuth token，不是 API Key
+- Vertex AI 不支持这种认证方式
+
+### 常见错误排查
+
+如果遇到 `401 UNAUTHENTICATED` 错误：
+
+1. ✅ 检查 API Key 是否从 **Google Cloud Console** 创建
+2. ✅ 确认 API Key 格式正确（以 `AIza` 开头）
+3. ✅ 验证 Google Cloud 项目已启用 Vertex AI API
+4. ✅ 检查是否需要配置代理（见 [PROXY_CONFIG.md](PROXY_CONFIG.md)）
+
+详细配置和故障排除见：[VERTEX_AI_CONFIG.md](VERTEX_AI_CONFIG.md)
 
 ---
 

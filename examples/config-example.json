@@ -12,7 +12,7 @@
   "kernel_size": 5,
   "mask_dilation_offset": 50,
   "translator": {
-    "translator": "gemini",
+    "translator": "vertex",
     "target_lang": "CHS",
     "no_text_lang_skip": false,
     "high_quality_prompt_path": "dict/prompt_example.json",

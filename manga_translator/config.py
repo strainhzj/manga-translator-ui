@@ -114,6 +114,7 @@ class Translator(str, Enum):
     openai_hq = "openai_hq"
     gemini = "gemini"
     gemini_hq = "gemini_hq"
+    vertex = "vertex"
     sakura = "sakura"
     none = "none"
     original = "original"

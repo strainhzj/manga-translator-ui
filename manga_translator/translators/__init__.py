@@ -7,6 +7,7 @@ from .openai import OpenAITranslator
 from .openai_hq import OpenAIHighQualityTranslator
 from .gemini import GeminiTranslator
 from .gemini_hq import GeminiHighQualityTranslator
+from .vertex import VertexTranslator
 from .sakura import SakuraTranslator
 from .none import NoneTranslator
 from .original import OriginalTranslator
@@ -18,6 +19,7 @@ GPT_TRANSLATORS = {
     Translator.openai_hq: OpenAIHighQualityTranslator,
     Translator.gemini: GeminiTranslator,
     Translator.gemini_hq: GeminiHighQualityTranslator,
+    Translator.vertex: VertexTranslator,
 }
 
 TRANSLATORS = {

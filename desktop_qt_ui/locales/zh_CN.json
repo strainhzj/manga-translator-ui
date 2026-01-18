@@ -173,6 +173,8 @@
   "label_GEMINI_API_KEY": "Gemini API 密钥",
   "label_GEMINI_MODEL": "Gemini 模型",
   "label_GEMINI_API_BASE": "Gemini API 地址",
+  "label_VERTEX_API_KEY": "Vertex AI API 密钥",
+  "label_VERTEX_MODEL": "Vertex AI 模型",
   "label_SAKURA_API_BASE": "SAKURA API 地址",
   "label_SAKURA_DICT_PATH": "SAKURA 词典路径",
   "label_SAKURA_VERSION": "SAKURA API 版本",

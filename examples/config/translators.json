@@ -154,5 +154,11 @@
     "display_name": "高质量翻译 Gemini",
     "required_env_vars": [],
     "optional_env_vars": ["GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_API_BASE"]
+  },
+  "vertex": {
+    "name": "vertex",
+    "display_name": "Google Vertex AI",
+    "required_env_vars": [],
+    "optional_env_vars": ["VERTEX_API_KEY", "VERTEX_MODEL"]
   }
 }

@@ -578,7 +578,7 @@ class MainAppLogic(QObject):
                     api_key="sk-114514",  # Sakura使用固定密钥
                     base_url=api_base
                 )
-                
+
                 try:
                     # 如果指定了模型，测试该模型
                     if model and model.strip():
@@ -596,7 +596,68 @@ class MainAppLogic(QObject):
                         return True, "连接成功"
                 finally:
                     await client.close()
-            
+
+            elif "vertex" in translator_key.lower():
+                # Google Vertex AI 使用 REST API
+                import aiohttp
+                import json
+                import os
+
+                # 使用默认模型（如果未指定）
+                test_model = model.strip() if model and model.strip() else "gemini-3-pro-preview"
+
+                # 构建 API URL
+                url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{test_model}:streamGenerateContent?key={api_key}"
+
+                # 构建测试请求
+                request_data = {
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [{"text": "test"}]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "topP": 0.95,
+                        "topK": 64,
+                    }
+                }
+
+                # 读取代理配置
+                proxy = None
+                https_proxy = os.getenv('HTTPS_PROXY') or os.getenv('https_proxy')
+                http_proxy = os.getenv('HTTP_PROXY') or os.getenv('http_proxy')
+
+                if https_proxy:
+                    proxy = https_proxy
+                elif http_proxy:
+                    proxy = http_proxy
+
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=request_data, headers={"Content-Type": "application/json"}, proxy=proxy) as response:
+                            if response.status == 200:
+                                # 读取响应（流式）
+                                response_text = await response.text()
+                                if response_text:
+                                    return True, f"连接成功，模型 {test_model} 可用"
+                                else:
+                                    return False, f"连接成功但模型 {test_model} 返回空响应"
+                            elif response.status == 401:
+                                return False, "API Key 无效或已过期"
+                            elif response.status == 403:
+                                return False, "权限不足，请检查 API Key 权限"
+                            elif response.status == 404:
+                                return False, f"模型 {test_model} 不存在"
+                            else:
+                                error_text = await response.text()
+                                return False, f"连接失败 (HTTP {response.status}): {error_text[:200]}"
+                except aiohttp.ClientConnectorError:
+                    return False, "网络连接失败，请检查网络连接或代理设置"
+                except Exception as e:
+                    return False, f"连接失败: {str(e)}"
+
             else:
                 return False, "该翻译器不支持API测试"
                 
@@ -697,7 +758,20 @@ class MainAppLogic(QObject):
                     return True, model_ids, "获取成功"
                 finally:
                     await client.close()
-            
+
+            elif "vertex" in translator_key.lower():
+                # Google Vertex AI - 返回常用的 Gemini 模型列表
+                # Vertex AI 没有提供简单的 REST API 来获取模型列表，所以返回预定义列表
+                common_models = [
+                    "gemini-3-pro-preview",
+                    "gemini-2.5-pro-preview-03-25",
+                    "gemini-2.5-flash-preview-04-17",
+                    "gemini-2.0-flash-exp",
+                    "gemini-1.5-pro",
+                    "gemini-1.5-flash",
+                ]
+                return True, common_models, "已加载常用模型列表"
+
             else:
                 return False, [], "该翻译器不支持获取模型列表"
                 
@@ -833,6 +907,7 @@ class MainAppLogic(QObject):
                     "openai_hq": self._t("translator_openai_hq"),
                     "gemini": "Google Gemini",
                     "gemini_hq": self._t("translator_gemini_hq"),
+                    "vertex": "Google Vertex AI",
                     "sakura": "Sakura",
                     "none": self._t("translator_none"),
                     "original": self._t("translator_original"),
@@ -938,6 +1013,8 @@ class MainAppLogic(QObject):
                     "GEMINI_API_KEY": self._t("label_GEMINI_API_KEY"),
                     "GEMINI_MODEL": self._t("label_GEMINI_MODEL"),
                     "GEMINI_API_BASE": self._t("label_GEMINI_API_BASE"),
+                    "VERTEX_API_KEY": self._t("label_VERTEX_API_KEY"),
+                    "VERTEX_MODEL": self._t("label_VERTEX_MODEL"),
                     "SAKURA_API_BASE": self._t("label_SAKURA_API_BASE"),
                     "SAKURA_DICT_PATH": self._t("label_SAKURA_DICT_PATH"),
                     "SAKURA_VERSION": self._t("label_SAKURA_VERSION"),

@@ -173,6 +173,8 @@
   "label_GEMINI_API_KEY": "Gemini API Key",
   "label_GEMINI_MODEL": "Gemini Model",
   "label_GEMINI_API_BASE": "Gemini API Base",
+  "label_VERTEX_API_KEY": "Vertex AI API Key",
+  "label_VERTEX_MODEL": "Vertex AI Model",
   "label_SAKURA_API_BASE": "SAKURA API Base",
   "label_SAKURA_DICT_PATH": "SAKURA Dictionary Path",
   "label_SAKURA_VERSION": "SAKURA API Version",
